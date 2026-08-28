@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Light window background. Compose paints the real surface on top; this only governs the
+      frame before the first composition, so it must track night mode or the launch flashes
+      the wrong colour.
+    -->
+    <style name="Theme.Toolbill" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>

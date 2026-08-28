@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Toolbill</string>
+    <string name="widget_name">Monthly burn</string>
+    <string name="widget_description">Your normalized monthly spend and the next renewals.</string>
+</resources>

@@ -1,0 +1,1211 @@
+Deliverable 1
+Toolbill design system
+Material 3 tokens, type scale and component states for the Android app. Every value below maps 1:1 to a Compose ColorScheme / Typography entry.
+IBM Plex Sans / IBM Plex Mono
+4dp spacing base
+360dp baseline width
+Assumption
+Hierarchy is carried by type size and 1px dividers. Cards are used only where content is genuinely a separable object — the FX notice and the paywall plans. Everything else is a flat surface on surface .
+Accent discipline
+Amber is the only accent: FAB, primary buttons, selected states, and the due-soon window. Red is reserved for overdue and destructive confirmation. Teal appears only on trials.
+Numbers
+All money is IBM Plex Mono with tnum on, so decimals column-align in a 35-row list. Currency codes sit at 11sp, muted, never bolder than the figure.
+Normalized monthly
+Every sort, every total and every list runs on amount × (365.25 / cycleDays) / 12 . An annual ₹4,662 plan is ₹388.50 a month and ranks there. Raw charge amounts survive only in the calendar, the due list and the CSV — the three places where the real number is the point.
+Currency notation · one rule
+ISO code labels the hero figure and the detail header — INR 44,170.50 . The ₹ symbol goes inline in rows, chips, badges, footers, captions and widgets. Never a code and a symbol in the same figure. In an aligned amount column the currency is declared once in the column head and never repeated per row, so the digits stay in a single tabular block. INR uses Indian digit grouping: ₹5,30,046 , not ₹538,398.
+Money/Hero autosize
+45sp fits ~11 characters at 360dp. High-denomination currencies routinely exceed that, so the hero style steps down instead of truncating.
+≤7 digits 45sp · displayMedium
+8–9 digits 36sp · displaySmall
+10+ digits 32sp · headlineLarge
+01 — Color · dark scheme (primary design)
+Warm neutral, not the default purple-tinted M3 dark. Surface steps are 4–6 tones apart so dividers still read without elevation.
+primary
+#F2C35C
+onPrimary
+#3A2B00
+primaryContainer
+#54400A
+onPrimaryContainer
+#FFDF9E
+secondary
+#C3C7C1
+onSecondary
+#2C312D
+secondaryContainer
+#424743
+onSecondaryContainer
+#DFE4DE
+tertiary
+#7FD4C1
+onTertiary
+#003730
+tertiaryContainer
+#0F3B34
+onTertiaryContainer
+#9BF0DC
+error
+#FF6B5E
+onError
+#4A0F0A
+errorContainer
+#4A1611
+onErrorContainer
+#FFDAD5
+surfaceContainerLowest
+#0C0B0A
+surface
+#121110
+surfaceContainerLow
+#1A1917
+surfaceContainer
+#1E1D1B
+surfaceContainerHigh
+#292724
+surfaceContainerHighest
+#343130
+surfaceVariant
+#302E2A
+onSurface
+#EAE6E0
+onSurfaceVariant
+#A9A39A
+outline
+#6C6862
+outlineVariant
+#4A4842
+inverseSurface
+#EAE6E0
+02 — Semantic state colors
+Six subscription states. Each has a content color and a container for the badge fill. Cancelled and paused are deliberately colorless.
+State
+Content (dark)
+Container (dark)
+Badge
+Ratio
+active
+#A9A39A
+#1E1D1B
+ACTIVE
+7.5:1
+on surface
+due soon
+#F2C35C
+#3B2E08
+DUE 3d
+11.4:1
+on surface
+overdue
+#FF6B5E
+#4A1611
+OVERDUE
+6.8:1
+on surface
+trial
+#7FD4C1
+#0F3B34
+TRIAL
+10.9:1
+on surface
+cancelled
+#8F8A81
+#161514
+CANCELLED
+5.3:1
+was 4.0:1
+paused
+never counted in burn
+#9FB4D8
+#1D2530
+PAUSED
+7.4:1
+on container
+03 — Light scheme (second pass, not an inversion)
+Primary drops to tone 30 so amber stays legible on paper-white. Neutrals warm slightly rather than going pure grey; state colors are re-picked, not flipped.
+primary
+#7A5A00
+onPrimary
+#FFFFFF
+primaryContainer
+#FFE0A0
+onPrimaryContainer
+#261A00
+secondary
+#5A5F5A
+secondaryContainer
+#DDE3DC
+tertiary
+#00695C
+tertiaryContainer
+#A8F0E0
+error
+#B3261E
+errorContainer
+#FFDAD5
+surfaceContainerLowest
+#FFFFFF
+surface
+#FCFBF8
+surfaceContainerLow
+#F7F5F0
+surfaceContainer
+#F2F0EA
+surfaceContainerHigh
+#ECE9E2
+surfaceContainerHighest
+#E6E3DB
+surfaceVariant
+#E7E3DA
+onSurface
+#1B1A17
+onSurfaceVariant
+#55524A
+outline
+#86817A
+outlineVariant
+#D4D0C7
+dueSoon (light)
+#8A6A00
+trial (light)
+#0B5A4E
+cancelled (light)
+#6F6A62
+dividerDense (light)
+#C9C4BA
+04 — Branded fallback vs Material You
+Same row, four schemes. Only primary, primaryContainer and the due-soon accent are taken from the wallpaper palette; surfaces stay near-neutral so dense lists don't tint. Overdue red and trial teal are never dynamic — they must mean the same thing on every device.
+Branded (default)
+Vercel Pro 1,742.00
+DUE 4d INR · monthly
+Add subscription
+Dynamic · violet wallpaper
+Vercel Pro 1,742.00
+DUE 4d INR · monthly
+Add subscription
+Dynamic · green wallpaper
+Vercel Pro 1,742.00
+DUE 4d INR · monthly
+Add subscription
+Dynamic · light, blue wallpaper
+Vercel Pro 1,742.00
+DUE 4d INR · monthly
+Add subscription
+05 — Type scale
+IBM Plex Sans for all M3 roles. Display roles are used only for money, so the scale below is trimmed at the top: displayLarge exists but the app never uses it on a 360dp screen.
+M3 role
+Size / line / track
+Specimen · where used
+displayMedium
+45 / 52 / 0
+44,170 Home monthly burn
+displaySmall
+36 / 44 / 0
+1,742.00 Detail header amount
+headlineMedium
+28 / 36 / 0
+Where your money goes Onboarding, paywall
+headlineSmall
+24 / 32 / 0
+Large top app bar title LargeTopAppBar expanded
+titleLarge
+22 / 28 / 0
+Add subscription Bottom sheet title
+titleMedium
+16 / 24 / +0.15
+Adobe Creative Cloud List row headline
+titleSmall
+14 / 20 / +0.1
+Section subhead Settings groups
+bodyLarge
+16 / 24 / +0.5
+Text field input All form fields
+bodyMedium
+14 / 20 / +0.25
+Supporting text, rationale copy Body copy
+bodySmall
+12 / 16 / +0.4
+Renews 4 Sep · every 30 days Row support line
+labelLarge
+14 / 20 / +0.1 · 500
+Save subscription Buttons
+labelMedium
+12 / 16 / +0.5 · 500
+Business Chips, nav labels
+labelSmall
+11 / 16 / +0.5 · 500
+USD Currency codes, badges
+Monetary treatment
+A separate Money text style set, IBM Plex Mono with FeatureSettings("tnum") . The minor unit is one step down and muted, so the eye lands on the rupees, not the paise.
+INR
+38,240 .50
+/ month
+Aligned decimals 1,742.00
+in a 35-row list 99.00
+never re-flows 12,499.99
+Autosize · same component, three currencies
+45sp INR 44,170 .50
+36sp VND 132.480.000
+32sp IDR 1.284.600.000
+The step is chosen from significant digits, not measured width, so it is stable across fonts and locales. Minor units are dropped entirely above 9 digits — in VND and IDR they carry no meaning.
+Spacing · 4dp base
+space1 4dp · icon to label
+space2 8dp · inside a row
+space3 12dp · row vertical
+space4 16dp · screen gutter
+space6 24dp · between groups
+space8 32dp · section break
+space12 48dp · hero padding
+Corner radius
+xs 4
+badges
+sm 8
+fields
+md 12
+buttons
+lg 16
+FAB, sheet
+full 28
+chips
+06 — Components & states
+Each block names the Compose component it maps to. Pressed states are the M3 state-layer overlay (onSurface at 10%), disabled is content at 38% / container at 12%.
+Subscription list row ListItem · 72dp
+Fi
+Figma Professional
+monthly · in 18 days · B
+1,340.00
+USD 15.00
+Cl
+Claude Pro
+pressed · state layer 10%
+1,742.00
+USD 20.00
+Ve
+Vercel Pro
+DUE 4d monthly
+1,742.00
+USD 20.00
+He
+Heroku Dynos
+OVERDUE 2d
+2,180.00
+USD 25.00
+Li
+Linear Standard
+TRIAL · 6d left
+696.00
+then USD 8
+No
+Notion Plus
+cancelled 12 Jul
+880.00
+Sh
+Shopify Basic
+PAUSED
+7.4:1
+on container
+2,499.00
+Large amount display Text · Money/Hero
+Monthly burn
+INR 38,240 .50
+Due soon
+INR 4,921 .00
+Loading
+Text field · currency-amount field OutlinedTextField
+Service name
+e.g. Figma
+enabled · empty
+Service name
+Claude Pro
+focused
+Trial end date
+—
+disabled · 38%
+Amount
+0
+! Enter an amount above zero
+Amount
+20.00
+USD ▾
+currency-amount field · trailing ExposedDropdownMenuBox
+≈ 1,742.00 INR at today's rate — recalculated on each charge, never back-dated.
+FilterChip FilterChip
+All
+✓ Business
+Personal
+Cancelled
+Paused
+default · selected · default · pressed · disabled
+SegmentedButton
+Cost
+Renewal
+Name
+SingleChoiceSegmentedButtonRow · sort
+Buttons Button · Outlined · Text
+Save Save Save
+filled: default · pressed · disabled
+Cancel Cancel Cancel
+outlined: default · pressed · disabled
+Skip Skip Skip
+text: default · pressed · disabled
+Delete Delete
+destructive: confirm · text
++ Add +
+ExtendedFloatingActionButton · FAB
+Empty state Column · typographic
+0.00
+Nothing tracked yet.
+Add the first tool you pay for. Takes about fifteen seconds, and there's no limit on how many you keep.
+Add subscription Import CSV
+No illustration, no mascot. The zeroed hero figure is the illustration — it's the same component the populated screen uses, so the layout doesn't jump when data arrives.
+Next: Deliverable 2 — the thirteen screens, each in a 360dp Android frame with the component names annotated, plus the Glance widget sizes, the 600dp+ tablet pass and the predictive-back preview.
+Deliverable 2
+Screens
+Every frame is 360dp wide, edge-to-edge, dark theme first. Grey monospace captions name the Compose component and the TopAppBar variant. Content is inset from the status bar and the 3-button/gesture nav area via WindowInsets.systemBars ; lists scroll under the bars with contentPadding .
+01 — Onboarding Three screens, no account, no paywall. Skip lands you in an empty Home.
+1 · Home currency  ·  Scaffold, no app bar
+9:41 ◢ ▮ 84%
+Step 1 of 3
+What currency do you think in?
+Every total in Toolbill is converted to this. You can still enter subscriptions in the currency they're billed in.
+Home currency
+Indian rupee INR
+Detected from your device region. Change it any time in Settings.
+US dollar USD
+Euro EUR
+Pound sterling GBP
+Canadian dollar CAD
+Australian dollar AUD
+Continue
+2 · Business / personal  ·  SingleChoiceSegmentedButtonRow
+9:41 ◢ ▮ 84%
+Step 2 of 3
+Do you need to separate business spend?
+If yes, every subscription gets a business or personal tag and the CSV export splits them for filing.
+Both, tagged
+Business only
+Personal
+Default new entries to business
+Most of your tools are probably deductible.
+Track FX drift
+Records what each foreign charge actually cost you.
+No account, ever
+Data is stored on this device. Backup is optional and goes to your own Google Drive. Toolbill never asks for bank credentials.
+Back Continue
+3 · First entry  ·  straight into the add sheet
+9:41 ◢ ▮ 84%
+Step 3 of 3
+Add your most expensive tool first.
+One entry is enough to see how this works. Add the rest whenever — there's no cap on the free tier.
+Common starting points
+Adobe CC
+AWS
+Figma
+Google Workspace
+Shopify
+Claude
+Vercel
+Notion
+Picking a chip pre-fills name, category and the usual billing cycle. Everything stays editable — nothing is fetched from a server.
+Skip for now Add manually
+02 — Home MediumTopAppBar (collapses to a 64dp bar with the burn figure inline), NavigationBar, ExtendedFloatingActionButton.
+Default · 31 active + 1 trial of 35 tracked
+9:41 ◢ ▮ 84%
+Toolbill ⌗
+Monthly burn normalized
+INR 44,170 .50
+Annualized
+5,30,046
+Business
+96%
+Active
+31
+TRIAL
++₹696/mo from 30 Aug, when Linear's trial ends · not in burn until it charges
+FX
+This month is ₹1,254 higher on rates alone
+USD/INR moved 3.1% since July · ₹40,438 of your burn is USD-billed. Shown because both thresholds were crossed: 3% and ₹500.
+Next 7 days ₹14,446.00
+All eight charges, listed in full — actual amounts, not normalized shares. Linear's trial converts 30 Aug (+₹696) and sits under Needs attention instead.
+25
+AUG
+Vercel Pro
+in 1 day · monthly · B
+1,742.00
+USD 20.00
+27
+AUG
+Claude Pro
+in 3 days · monthly · B
+1,742.00
+USD 20.00
+27
+AUG
+Sentry Team
+in 3 days · monthly · B
+2,436.00
+USD 28.00
+27
+AUG
+Google Workspace
+in 3 days · monthly · B
+1,020.00
+29
+AUG
+Namecheap · 3 domains
+in 5 days · annual charge · ₹264.92/mo
+3,179.00
+USD 36.51
+30
+AUG
+Fly.io
+in 6 days · monthly · B
+2,436.00
+USD 28.00
+31
+AUG
+Resend Pro
+in 7 days · monthly · B
+1,742.00
+USD 20.00
+31
+AUG
+Spotify Duo
+in 7 days · monthly · P
+149.00
+8 CHARGES · 25–31 AUG ₹14,446.00
++ Add
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+Loading · skeleton, and a triggered FX notice
+9:41 ◢ ▮ 84%
+Toolbill ⌗
+Monthly burn · August
+Recalculating from 35 local records — no network needed.
+!
+AWS charged 6.4% more than last month
+₹7,412 vs ₹6,966 in July — ₹446 more for the same USD 85.10. Over 3% and over ₹500 across your USD tools, so you get told.
+See FX history
+Needs attention
+22
+AUG
+Heroku Dynos
+OVERDUE 2d mark paid?
+2,180.00
+30
+AUG
+Linear Standard
+TRIAL ENDS 6d
+696.00
+first charge
+Marked Heroku as paid Undo
+Snackbar · SnackbarHost, action = Undo
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+Light theme pass · same screen
+9:41 ◢ ▮ 84%
+Toolbill ⌗
+Monthly burn · August
+INR 44,170 .50
+Annualized
+5,30,046
+Business
+96%
+Active
+31
+TRIAL
++₹696/mo from 30 Aug, when Linear's trial ends · not in burn until it charges
+FX
+This month is ₹1,254 higher on rates alone
+3.1% and ₹1,254 — both thresholds crossed.
+Next 7 days ₹14,446.00
+25
+AUG
+Vercel Pro
+in 1 day · monthly · B
+1,742.00
+USD 20.00
+27
+AUG
+Claude Pro
+in 3 days · monthly · B
+1,742.00
+USD 20.00
+27
+AUG
+Sentry Team
+in 3 days · monthly · B
+2,436.00
+USD 28.00
+27
+AUG
+Google Workspace
+in 3 days · monthly · B
+1,020.00
+29
+AUG
+Namecheap · 3 domains
+in 5 days · annual charge
+3,179.00
+₹264.92/mo
+30
+AUG
+Fly.io
+in 6 days · monthly · B
+2,436.00
+USD 28.00
+31
+AUG
+Resend Pro
+in 7 days · monthly · B
+1,742.00
+USD 20.00
+31
+AUG
+Spotify Duo
+in 7 days · monthly · P
+149.00
+8 CHARGES · 25–31 AUG ₹14,446.00
++ Add
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+Hero autosize · high-denomination currencies
+9:41 ◢ ▮ 84%
+Toolbill ⌗
+Monthly burn 45sp · 7 digits
+INR 44,170 .50
+Same user · Vietnam 36sp · 9 digits
+VND 132.480.000
+Minor units dropped — đồng has none in practice.
+Same user · Indonesia 32sp · 10 digits
+IDR 1.284.600.000
+Before · 45sp, clipped
+IDR 1.284.600.0
+The figure the user cares about most was the one truncating. Autosize is applied to the hero, the detail header and the widget — everywhere the Money/Hero style is used.
+Group separators follow the locale ( . in vi-VN and id-ID, Indian grouping in en-IN), so the digit count that drives the step is counted on significant digits only.
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+03 — All subscriptions TopAppBar (small, pinned) · FilterChip row · SingleChoiceSegmentedButtonRow for sort · LazyColumn of ListItem, 56dp rows, sticky month-agnostic dividers.
+Empty · typographic, no illustration
+9:41 ◢ ▮ 84%
+All ⌕
+0.00
+No subscriptions yet.
+Add them as you notice the charges — you don't have to do all thirty in one sitting. Unlimited entries, free, forever.
+Add subscription Import from CSV
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+8 items · sorted on normalized monthly
+9:41 ◢ ▮ 84%
+All · 8 ⌕
+All
+Business
+Personal
+Cancelled
+Cost Renewal Name high → low · /mo
+Service ₹ / month
+AWS
+monthly · in 9 days · B
+7,412.00
+USD 85.10
+Heroku Dynos
+OVERDUE 2d monthly
+2,180.00
+USD 25.00
+Vercel Pro
+DUE 1d monthly · B
+1,742.00
+USD 20.00
+Linear Standard
+TRIAL 6d then ₹696/mo from 30 Aug
+696.00
+not charged yet
+Adobe Creative Cloud
+annual · in 41 days · B
+388.50 /mo
+₹4,662.00 · USD 54.99
+Namecheap · 3 domains
+DUE 5d annual · B
+264.92 /mo
+₹3,179.00 · USD 36.51
+Shopify Basic
+PAUSED resumes 1 Oct
+2,499.00
+Notion Plus
+cancelled 12 Jul · kept for records
+880.00
+₹11,987.42 / month across 5 active
+excludes 1 trial (₹696 from 30 Aug), 1 paused (₹2,499) and 1 cancelled · annual plans counted at their monthly share
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+35 items · frame extended to show the full scroll (device shows ~15)
+9:41 ◢ ▮ 84%
+All · 35
+₹44,170.50 / mo ⌕
+All
+Business 29
+Personal 6
+Cancelled
+Cost Renewal Name A → Z
+Service ₹ / month
+Heroku Dynos
+OVERDUE 2d monthly · B
+2,180.00
+USD 25.00
+Linear Standard
+TRIAL 6d then ₹696/mo from 30 Aug · B
+696.00
+not charged yet
+Shopify Basic
+PAUSED resumes 1 Oct · not in burn
+2,499.00
+Webflow CMS
+cancelled 3 Aug · kept for records
+2,001.00
+Notion Plus
+cancelled 12 Jul · kept for records
+880.00
+{{ r.name }}
+{{ r.meta }}
+{{ r.mo }} {{ r.suffix }}
+{{ r.sub }}
+₹{{ derivTotal }} / month across 31 active
+excludes 1 trial (₹696 from 30 Aug), 1 paused (₹2,499) and 2 cancelled (₹880, ₹2,001) · {{ derivCount }} rows tracked
+₹{{ derivListed }} listed + ₹{{ derivStatic }} overdue = ₹{{ derivTotal }} · ×12 = ₹{{ derivAnnualized }}
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+Density note
+Rows are 52–56dp: name at titleMedium, one 11sp support line, amount right-aligned in tabular mono. No leading avatar in the dense list — the 32dp monogram only appears on Home's next-7-days list, where there are at most five rows. That buys three extra rows per screen and keeps the amount column at a fixed x.
+Business/personal is a single mono B / P glyph in the support line rather than a coloured chip — with 35 rows, 35 chips is noise, and the filter chips above already carry the colour.
+Sorting is a SegmentedButton, not a menu: three options, always visible, one tap. Long-press a row for a ModalBottomSheet with mark paid / pause / duplicate / delete.
+Next 7 days lists all eight charges rather than truncating at four. A “+4 more this week” affordance would hide ₹7,506 — more than half the week's money — behind a tap, and the one number this block exists to justify would stop being checkable on screen. Home scrolls; the frame above is drawn tall to show the whole list, the way the 35-row list is. The footer repeats the total so the arithmetic closes in view.
+Non-monthly rows carry two figures: the normalized monthly is primary, the real charge sits under it as ₹4,662.00 · USD 54.99 . Monthly rows keep one figure, so the second line appears only where it changes the ranking.
+The currency is declared once in the column head — ₹ / month — not repeated on 35 rows, which keeps the digits in one tabular block.
+contentDescription: the B/P glyph reads “Business expense” / “Personal”; each badge reads its full state and timing (“Overdue by 2 days”, “Trial ends in 6 days”); the amount reads “₹388 fifty paise per month, billed annually as ₹4,662”. A one-time tooltip anchored to the first B glyph introduces it, dismissed on tap and never shown again.
+04 — Add / edit subscription ModalBottomSheet, skipPartiallyExpanded = false.
+Why a sheet, not a full screen: adding is a repeated, low-commitment act — a user entering their fifth tool in a row should never lose sight of the list. The sheet keeps the back gesture cheap (swipe down = discard, no dialog when nothing was typed), reaches 92% height when the keyboard is up so it functions as a full screen when it needs to, and lets the required fields — name, amount, cycle — sit above the fold with the keyboard open. Edit reuses the same sheet with values pre-filled and a Delete text button in the header. The one exception: custom billing cycle pushes a nested sheet rather than growing this one.
+A · Smart defaults, just opened
+9:41 ◢ ▮ 84%
+Add subscription Cancel
+Service
+Search or type a name
+Amount
+0.00
+Currency
+INR ▾
+Billing cycle
+Monthly
+Annual
+Quarterly
+Weekly
+···
+First charge
+Today 1 Sep Pick…
+Business expense
+Category Auto · from name ▾
++ Notes + Trial end date
+Save Save & add another
+Save enables once name and amount are set. Nothing leaves the device.
+B · Partially filled · autocomplete + keyboard, sheet at 92%
+9:41 ◢ ▮ 84%
+Add subscription Cancel
+Service
+Clau
+Clau de Pro AI · monthly · USD
+Clau de Max AI · monthly · USD
+Use “Clau” as typed ↵
+Amount
+0.00
+Currency
+USD ▾
+Name, cycle, currency and category came from the catalogue. The amount is the one field we never guess — it's focused and waiting. Conversion at today's rate 87.10 appears once you type it.
+Monthly
+Annual
+Quarterly
+Weekly
+···
+Business expense
+Save ＋ Another
+Claude Clause Claudia
+q w e r t y u i o p
+a s d f g h j k l
+⇧ z x c v b n m ⌫
+?123 ↵
+C · Validation error + edit-mode header
+9:41 ◢ ▮ 84%
+Edit subscription Delete
+Service
+Adobe Creative Cloud
+Amount
+0
+! Amount must be more than zero
+Currency
+USD ▾
+Monthly
+Annual
+Quarterly
+Weekly
+···
+Trial end date
+12 Jul 2026 ▤
+· Trial ended before the first charge on 14 Sep — that happens. Saved as-is.
+Business expense
+Notes
+Shared with Ravi — split 50/50
+Searchable from the top bar.
+Save changes
+One blocking error and one non-blocking hint. Only the amount holds Save; the trial date is amber and lets you through. Both appear on blur, never while typing.
+Speed decisions
+Name field is focused on open, keyboard already up. A local catalogue of ~400 common SaaS names pre-fills name, currency, billing cycle and category — shipped in the APK, no network.
+It never pre-fills the amount. Bundled prices go stale within months, and a silently wrong amount corrupts the burn total permanently, because nobody re-checks a field that was already filled. Focus lands on the empty amount instead — the one number only the user's invoice knows.
+Currency defaults to home currency, but flips to the last currency you used for a business entry, since these users mostly pay USD.
+First charge offers Today / next 1st / DatePicker — three taps saved for the common case. Category, notes and trial date are progressive: hidden behind text buttons so the required path is four fields long.
+Save & add another keeps the sheet open and resets only name and amount — the pattern that gets someone from zero to thirty entries in one sitting.
+05 — Detail · 06 Calendar · 07 Insights Detail: TopAppBar (small, with overflow menu) + AlertDialog for destructive confirm. Calendar & Insights: MediumTopAppBar.
+Detail · foreign currency, FX sparkline
+9:41 ◢ ▮ 84%
+←
+Edit ⋮
+DUE 3d BUSINESS · AI TOOLS
+Claude Pro
+INR 1,742 .00 / month · USD 20.00
+Paid · captured
+6,840.60
+Charges
+4 + 7
+Since
+Oct 25
+What USD 20 actually cost +3.0% since 27 Apr
+[svg]
+₹1,692.00 · 27 Apr 26 ₹1,742.00 · 27 Aug 26
+Starts at the first rate Toolbill captured itself — install day, 12 Apr 2026. Nothing before that is drawn, because nothing before that was measured. contentDescription: “rate rose from ₹1,692 in April to ₹1,742 in August, up 3.0%”.
+Payment history
+27 Jul 2026
+rate 86.42
+1,728.40
+27 Jun 2026
+rate 85.90
+1,718.00
+27 May 2026
+rate 85.11
+1,702.20
+27 Apr 2026
+rate 84.60 · first capture
+1,692.00
+27 Mar 2026
+backfilled · rate —
+1,680.00
+27 Feb 2026
+backfilled · rate —
+—
+Show all 11 charges
+4 captured by Toolbill · 7 backfilled by you before install. Backfilled rows carry no rate — we don't invent one, and they stay out of the drift figure.
+Mark cancelled Delete
+Destructive confirm · AlertDialog
+9:41 ◢ ▮ 84%
+Delete Claude Pro?
+This removes the subscription and all 11 recorded charges — ₹19,004 of history that your CSV export uses. Marking it cancelled instead keeps the record for tax purposes.
+Cancel Mark cancelled Delete
+Delete is the last of three actions and the only red one. The middle action offers the safer thing the user probably wanted — no “are you sure” theatre, just the cheaper alternative stated plainly.
+Calendar · month grid, day expanded
+9:41 ◢ ▮ 84%
+August 2026
+‹ ›
+₹46,491.00 charged this month · 24 charges
+M T W T F S S
+27
+28
+29
+30
+31
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+today
+25
+26
+27
+28
+29
+30
+trial
+31
+<₹1k
+₹1–3k
+₹3k+
+48dp cells
+Thu 27 August ₹4,178.00
+Claude Pro
+monthly · business
+1,742.00
+Sentry Team
+monthly · business
+2,436.00
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+Insights · austere charts, no fills
+9:41 ◢ ▮ 84%
+Insights
+Financial year 2026–27 · Apr → Aug
+Spend by category · normalized monthly
+Hosting & infra 17,075.00
+Email & marketing 7,845.00
+Analytics 7,018.00
+AI tools 4,352.00
+Productivity 3,472.58
+Design 1,859.00
+Other · commerce 1,448.00
+Storage 836.00
+Domains 264.92
+sums to ₹44,170.50 — the same figure as the Home hero
+Business vs personal 96 / 4
+₹42,385.92 deductible ₹1,784.58 personal
+Cheaper billed annually
+Figma Professional
+₹16,080 → ₹13,400 a year −2,680
+Posthog Scale
+₹52,200 → ₹43,500 a year −8,700
+Slack Pro
+₹19,836 → ₹16,530 a year −3,306
+Switching all three saves ₹14,686 a year — 2.8% of your ₹5,30,046 annual tooling.
+FX impact · since 12 Apr capture +₹2,902
+[svg]
+Apr May Jun Jul Aug
+Dotted line is what you'd have paid at April's captured rate. You are paying 3.0% more for the same tools — ₹1,254 a month on ₹40,438 of USD-billed burn.
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+08 Export · 09 Paywall · 10 Notification rationale · 11 Diagnostic
+Export · DateRangePicker + CSV preview + share sheet
+9:41 ◢ ▮ 84%
+← Export for filing
+One row per charge, in your home currency, with the rate Toolbill captured on that date. Rows you backfilled from before install export with an empty rate rather than a guessed one. Eleven fixed categories plus other_label keep the columns stable year to year. A skipped renewal exports as a row like any other: status reads skipped and the home amount is 0 , so nothing quietly vanishes between the app and an accountant's spreadsheet.
+Period
+FY 2026–27
+This quarter
+Custom…
+From
+1 Apr 2026
+To
+31 Mar 2027
+Include
+✓ Business
+Personal
+Cancelled
+112 charges · 32 services · ₹2,16,955 total
+22 monthly × 5 months + 1 annual renewal + 1 trial conversion
+Preview
+date,service,cat,other,type,amt,ccy,rate,home,status
+26-08-27,Claude,AI,,biz,20.00,USD,87.10,1742,paid
+26-08-25,Vercel,Host,,biz,20.00,USD,87.10,1742,paid
+26-08-19,Posthog,Anly,,biz,50.00,USD,86.98,4349,paid
+26-08-16,iCloud+,Stor,,pers,749,INR,1.00,749,paid
+26-08-10,Judge.me,Other,Shop,biz,1299,INR,1.00,1299,paid
+26-06-09,AWS,Host,,biz,0,INR,,0,skipped
+26-03-27,Claude,AI,,biz,20.00,USD,,1680,paid
++ 106 more rows · empty rate = backfilled · status = paid or skipped
+Share CSV Save to Drive
+Generated on device. Android's share sheet decides where it goes — Toolbill never uploads it anywhere itself.
+Paywall · no timer, no pre-selection
+9:41 ◢ ▮ 84%
+✕ Restore purchase
+Toolbill Pro
+Tracking stays free and unlimited — all 31 of your subscriptions, forever, with no entry cap. Pro pays for the four things that need building and maintaining.
+01
+Renewal notifications
+Choose your lead time. Fires offline via AlarmManager.
+02
+CSV export
+Per-charge, with the rate captured that day where we have one.
+03
+Insights & FX history
+Savings, drift and category splits — from install day forward.
+04
+Google Drive backup
+Your Drive, your file. Restores on a new phone.
+Yearly
+₹1,499
+≈ $19 · renews yearly, cancel in Play Store
+Lifetime
+₹3,099
+≈ $39 · one payment, no renewal
+Neither option is pre-selected. If you file taxes as a business, both are deductible — the yearly is roughly what one of your mid-sized tools costs a month.
+If Pro lapses, nothing is deleted or hidden. You keep every entry and the app keeps working — you just stop getting reminders and exports.
+Pick a plan to continue
+Terms Privacy Not now
+Notification rationale · after first entry, before the system dialog
+9:41 ◢ ▮ 84%
+One thing before you go
+Want a nudge three days before a charge?
+That's the only reason Toolbill asks for notifications. It's the window where cancelling still saves you money.
+T
+Toolbill · now
+Vercel Pro renews in 3 days — ₹1,742
+Tap to review, pause, or mark cancelled.
+· Scheduled locally. No server sees your renewals.
+· One notification per renewal. Never a digest, never marketing.
+· Turn it off in Settings and nothing else changes.
+Allow notifications Not now
+Next you'll see Android's own permission dialog. We don't ask twice if you decline.
+Reminders not working? · device-specific, calm
+9:41 ◢ ▮ 84%
+← Reminders
+Your phone is probably putting Toolbill to sleep.
+Reminders are scheduled on the device, not sent from a server. That's better for privacy, but it means the system has to let Toolbill wake up at the right moment — and some manufacturers stop apps from doing that by default.
+Detected device Xiaomi · HyperOS 2
+Two settings to change
+1
+Set battery saver for Toolbill to No restrictions .
+2
+Turn on Autostart so reminders survive a reboot.
+Open battery settings Autostart
+Deep-links to the OEM screen. If it isn't available on your build, we show the standard Android battery page instead.
+Self-check
+Notification permission granted
+Exact alarms allowed
+Battery optimization restricted
+Last reminder fired 11 Aug, 09:00
+Widget last updated 6 days ago
+Send yourself a test reminder
+Arrives in 60 seconds. If it doesn't, the settings above are still blocking it. Send test
+The widget is frozen by the same policy. Glance refreshes through WorkManager, so a restricted app shows a stale burn figure with no warning — 6 days ago above is the tell. Fixing battery access fixes both.
+Also seen on Oppo, Vivo, OnePlus (App auto-launch) and Samsung (Sleeping apps). The guidance changes to match your device.
+12 Settings · predictive back · 13 Glance widget
+Settings · ListItem rows, no cards
+9:41 ◢ ▮ 84%
+← Settings
+MONEY
+Home currency
+Everything converts to this INR
+Exchange rates
+Refreshed on open when online · 24 Aug manual
+Tell me about FX drift over
+Both must be crossed before you hear from us 3% · ₹500
+Categories
+11 fixed, plus Other with your own label ›
+Paused subscriptions
+Out of burn, still listed, resume date shown excluded
+REMINDERS
+Lead time
+How early to warn you 3 days
+Reminders not working? ›
+APPEARANCE
+Theme
+System Light Dark
+Dynamic color
+Take the accent from your wallpaper
+DATA
+Google Drive backup
+Synced 2 hours ago · 74 KB
+Export CSV ›
+Import CSV or JSON ›
+Undo last import
+27 subscriptions, 2 hours ago · here for 24 hours ↺
+Restore purchases ›
+About
+1.4.0 · Pro (lifetime) ›
+Predictive back · detail → list, mid-gesture
+All · 35
+DUE 3d BUSINESS · AI TOOLS
+Claude Pro
+INR 1,742 .00
+Enabled with android:enableOnBackInvokedCallback . Detail scales to 90% and slides right while the list is already visible underneath. The add sheet opts out of the cross-activity animation and instead uses back-progress to slide itself down — so a half-committed gesture on a partly filled form can be released without losing the draft.
+Glance widget · 2×1, 4×1, 4×2
+Dark · branded
+MONTHLY
+₹ 44,170
+MONTHLY BURN
+₹ 44,170
+NEXT
+Vercel Pro
+tomorrow · ₹1,742
+4×2 · dark, light, and dynamic (wallpaper-derived)
+MONTHLY BURN UPD 09:41
+₹ 44,170
+Vercel Pro 1,742
+Claude Pro 1,742
+Namecheap 3,179
+NEXT 7 DAYS · ₹14,446
+MONTHLY BURN AUG
+₹ 44,170
+Vercel Pro 1,742
+Claude Pro 1,742
+Namecheap 3,179
+NEXT 7 DAYS · ₹14,446
+MONTHLY BURN AUG
+₹ 44,170
+Vercel Pro 1,742
+Claude Pro 1,742
+Namecheap 3,179
+NEXT 7 DAYS · ₹14,446
+Glance composables only: Column , Row , Text , Spacer and a GlanceTheme.colors background, so dynamic color comes free. The 2×1 drops the renewal list; the 4×1 keeps one renewal; the 4×2 shows three. Widget taps deep-link straight to the detail screen, and the whole widget reads from the same local store — it never blocks on a refresh.
+Light theme · the two hard cases Warm neutrals on paper-white lose their dividers first in a dense list. Both screens use a dedicated dividerDense token.
+Light · 35-row dense list
+9:41 ◢ ▮ 84%
+All · 35
+₹44,170.50 / mo ⌕
+All
+Business 29
+Personal 6
+Service ₹ / month
+Heroku Dynos
+overdue 2 days · monthly · B
+2,180.00
+USD 25.00
+Linear Standard
+trial ends in 6 days · then ₹696/mo · B
+696.00
+not charged yet
+Shopify Basic
+paused · resumes 1 Oct · not in burn
+2,499.00
+Adobe Creative Cloud
+annual · in 41 days · B
+388.50 /mo
+₹4,662.00 · USD 54.99
+AWS
+monthly · in 9 days · B
+7,412.00
+USD 85.10
+Claude Pro
+monthly · in 3 days · B
+1,742.00
+USD 20.00
+Cloudflare Pro
+monthly · in 12 days · B
+1,742.00
+USD 20.00
+Descript Creator
+monthly · in 14 days · B
+2,610.00
+USD 30.00
+Fathom Analytics
+annual · in 88 days · B
+101.50 /mo
+₹1,218.00 · USD 14.00
+Figma Professional
+monthly · in 18 days · B
+1,340.00
+USD 15.00
+Fly.io
+monthly · in 6 days · B
+2,436.00
+USD 28.00
+GitHub Team
+monthly · in 21 days · B
+348.00
+USD 4.00
+Google Workspace
+monthly · in 3 days · B
+1,020.00
+Grammarly Premium
+annual · in 133 days · P
+83.33 /mo
+₹1,000.00
+Hetzner CX22
+monthly · in 11 days · B
+432.00
+EUR 4.51
+₹44,170.50 / month across 31 active
+excludes 1 trial (₹696 from 30 Aug), 1 paused (₹2,499) and 2 cancelled (₹880, ₹2,001)
+▤
+Home
+≡
+All
+▦
+Calendar
+◱
+Insights
+Light · Insights
+9:41 ◢ ▮ 84%
+Insights
+Financial year 2026–27 · Apr → Aug
+Spend by category · normalized monthly
+Hosting & infra 17,075.00
+Email & marketing 7,845.00
+Analytics 7,018.00
+AI tools 4,352.00
+Productivity 3,472.58
+Design 1,859.00
+Other · commerce 1,448.00
+Storage 836.00
+Domains 264.92
+sums to ₹44,170.50 — the same figure as the Home hero
+Business vs personal 96 / 4
+₹42,385.92 deductible ₹1,784.58 personal
+Cheaper billed annually
+<div style="display:flex;justify-content:space-between;align-items:basel
