@@ -258,7 +258,7 @@ object ToolbillText {
     /** Insights category row — 12.5/17. */
     val insightsRow: TextStyle = TextStyle(
         fontFamily = IbmPlexSans,
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 12.5.sp,
         lineHeight = 17.sp,
     )

@@ -1,5 +1,6 @@
 package com.toolbill.android.core.design.component
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -20,11 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -39,16 +38,17 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.toolbill.android.core.design.ToolbillIcons
 import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Space
 import com.toolbill.android.core.design.Toolbill
@@ -230,7 +230,7 @@ fun ToolbillExtendedFab(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Add,
+                painter = painterResource(ToolbillIcons.Add),
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
@@ -293,7 +293,7 @@ fun ToolbillActionTextButton(
 /** An icon-only action, sized to the design's 40dp touch box. */
 @Composable
 fun ToolbillIconButton(
-    icon: ImageVector,
+    @DrawableRes icon: Int,
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -308,7 +308,7 @@ fun ToolbillIconButton(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = icon,
+            painter = painterResource(icon),
             contentDescription = contentDescription,
             tint = tint,
             modifier = Modifier.size(size),
@@ -366,7 +366,7 @@ fun ScreenHeader(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     /** Close rather than back where the screen is a dismissible overlay, like the paywall. */
-    backIcon: ImageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+    @DrawableRes backIcon: Int = ToolbillIcons.Back,
     backDescription: String = "Back",
     scroll: HeaderScroll = HeaderScroll(lifted = false, titleVisible = true),
     trailing: (@Composable RowScope.() -> Unit)? = null,
@@ -375,7 +375,7 @@ fun ScreenHeader(
         targetValue = if (scroll.lifted) {
             MaterialTheme.colorScheme.surface
         } else {
-            Color.Transparent
+            MaterialTheme.colorScheme.surface.copy(alpha = 0f)
         },
         animationSpec = tween(180),
         label = "headerFill",
@@ -386,22 +386,21 @@ fun ScreenHeader(
         label = "headerTitle",
     )
 
-    Column(modifier = modifier.fillMaxWidth().background(background)) {
+    Column(modifier = modifier.fillMaxWidth().background(background).statusBarsPadding()) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = backIcon,
+            ToolbillIconButton(
+                icon = backIcon,
                 contentDescription = backDescription,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack)
-                    .size(20.dp),
+                onClick = onBack,
             )
             if (title.isNotEmpty()) {
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(4.dp))
                 Text(
                     text = title,
                     style = ToolbillText.screenTitle,

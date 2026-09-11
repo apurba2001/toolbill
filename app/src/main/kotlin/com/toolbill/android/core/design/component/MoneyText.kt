@@ -31,6 +31,11 @@ fun HeroAmount(
     currency: String,
     modifier: Modifier = Modifier,
     spokenLabel: String? = null,
+    /**
+     * Fades the whole figure without changing its metrics, for the empty state -- which shows
+     * a real zero rather than a placeholder so the layout does not move when data arrives.
+     */
+    alpha: Float = 1f,
 ) {
     val formatted = MoneyFormat.hero(amountMinor, currency)
     val money = Toolbill.money
@@ -45,21 +50,21 @@ fun HeroAmount(
         Text(
             text = formatted.code,
             style = money.heroCode,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = alpha),
             modifier = Modifier.alignByBaseline(),
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = formatted.integer,
             style = money.hero(formatted.heroStep),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
             modifier = Modifier.alignByBaseline(),
         )
         if (formatted.fraction != null) {
             Text(
                 text = formatted.decimalSeparator + formatted.fraction,
                 style = money.heroFraction(formatted.heroStep),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                 modifier = Modifier.alignByBaseline(),
             )
         }

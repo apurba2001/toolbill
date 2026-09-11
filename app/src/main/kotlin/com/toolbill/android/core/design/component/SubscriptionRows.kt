@@ -110,17 +110,26 @@ fun DenseSubscriptionRow(
         Spacer(Modifier.width(Space.s2))
 
         Column(horizontalAlignment = Alignment.End) {
+            val amountColor = when {
+                dimmed -> muted
+                row.state == RowState.OVERDUE -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurface
+            }
+            val secondaryColor = when {
+                row.state == RowState.TRIAL -> Toolbill.stateColors.trial.content
+                else -> muted
+            }
             ColumnAmount(
                 amountMinor = row.normalizedMonthlyMinor,
                 currency = row.homeCurrency,
                 suffix = row.amountSuffix,
-                color = if (dimmed) muted else MaterialTheme.colorScheme.onSurface,
+                color = amountColor,
             )
             if (row.secondaryLine != null) {
                 Text(
                     text = row.secondaryLine,
                     style = Toolbill.money.rowSecondary,
-                    color = muted,
+                    color = secondaryColor,
                     maxLines = 1,
                 )
             }
@@ -203,6 +212,7 @@ fun UpcomingChargeRow(
 @Composable
 private fun RowBody(row: SubscriptionRowUi, modifier: Modifier = Modifier) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(modifier) {
         Text(
             text = row.name,
@@ -238,16 +248,26 @@ private fun RowBody(row: SubscriptionRowUi, modifier: Modifier = Modifier) {
 @Composable
 private fun RowAmounts(row: SubscriptionRowUi) {
     Column(horizontalAlignment = Alignment.End) {
+        val amountColor = when {
+            row.state == RowState.CANCELLED || row.state == RowState.PAUSED -> MaterialTheme.colorScheme.onSurfaceVariant
+            row.state == RowState.OVERDUE -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+        val secondaryColor = when {
+            row.state == RowState.TRIAL -> Toolbill.stateColors.trial.content
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
         ColumnAmount(
             amountMinor = row.normalizedMonthlyMinor,
             currency = row.homeCurrency,
             suffix = row.amountSuffix,
+            color = amountColor,
         )
         if (row.secondaryLine != null) {
             Text(
                 text = row.secondaryLine,
                 style = Toolbill.money.rowSecondary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = secondaryColor,
                 maxLines = 1,
             )
         }

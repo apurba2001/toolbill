@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,15 +31,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.toolbill.android.core.design.ToolbillIcons
 import com.toolbill.android.core.design.Space
 import com.toolbill.android.core.design.Toolbill
 import com.toolbill.android.core.design.ToolbillText
 import com.toolbill.android.core.design.component.ToolbillIconButton
 import com.toolbill.android.core.domain.date.chargeDatesInRange
+import com.toolbill.android.core.domain.money.FxRates
 import com.toolbill.android.core.domain.money.MoneyFormat
 import com.toolbill.android.core.domain.subscription.SubscriptionStatus
-import com.toolbill.android.feature.subscriptions.PricedSubscription
-import com.toolbill.android.feature.subscriptions.SampleData
+import com.toolbill.android.core.domain.subscription.PricedSubscription
 import com.toolbill.android.feature.subscriptions.label
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -65,15 +63,35 @@ private data class DayCharges(
 }
 
 /**
+ * The two thresholds, in the design's own base of rupees.
+ *
+ * Converted to the home currency rather than used as raw minor units. They were compared
+ * directly against the total, so on a dollar install the bands were $1,000 and $3,000 and every
+ * day in a normal month collapsed to a single dot.
+ */
+private const val LOW_BAND_INR_MINOR = 100_000L
+private const val HIGH_BAND_INR_MINOR = 300_000L
+
+private fun bandsFor(homeCurrency: String): Pair<Long, Long> {
+    val low = FxRates.convertMinor(LOW_BAND_INR_MINOR, "INR", homeCurrency) ?: LOW_BAND_INR_MINOR
+    val high = FxRates.convertMinor(HIGH_BAND_INR_MINOR, "INR", homeCurrency) ?: HIGH_BAND_INR_MINOR
+    return low to high
+}
+
+/**
  * Magnitude as a dot count.
  *
- * One dot under ₹1k, two to ₹3k, three above — same size, same colour. A single dot that grows
- * or changes hue encodes two variables in one mark and reads as a different kind of event.
+ * One dot for a small day, two for a middling one, three above — same size, same colour. A
+ * single dot that grows or changes hue encodes two variables in one mark and reads as a
+ * different kind of event.
  */
-private fun dotCount(totalMinor: Long): Int = when {
-    totalMinor < 100_000L -> 1
-    totalMinor < 300_000L -> 2
-    else -> 3
+private fun dotCount(totalMinor: Long, homeCurrency: String): Int {
+    val (low, high) = bandsFor(homeCurrency)
+    return when {
+        totalMinor < low -> 1
+        totalMinor < high -> 2
+        else -> 3
+    }
 }
 
 /** How a day cell is painted. Order matters: the first match wins. */
@@ -109,12 +127,14 @@ private fun chargesForMonth(
 fun CalendarScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    subscriptions: List<PricedSubscription> = SampleData.all,
+    subscriptions: List<PricedSubscription> = emptyList(),
+    homeCurrency: String = "INR",
+    today: LocalDate = LocalDate.now(),
 ) {
-    val home = SampleData.HOME_CURRENCY
-    val today = SampleData.today
+    val home = homeCurrency
     var month by remember { mutableStateOf(YearMonth.from(today)) }
-    var selected by remember { mutableStateOf<LocalDate?>(LocalDate.of(2026, 8, 27)) }
+    // Opens on today, so the first thing the grid explains is the day the user is standing on.
+    var selected by remember { mutableStateOf<LocalDate?>(today) }
 
     val charges = remember(subscriptions, month) { chargesForMonth(subscriptions, month) }
     val monthTotal = charges.values.sumOf { it.total }
@@ -148,12 +168,12 @@ fun CalendarScreen(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         ToolbillIconButton(
-                            icon = Icons.Rounded.ChevronLeft,
+                            icon = ToolbillIcons.ChevronLeft,
                             contentDescription = "Previous month",
                             onClick = { month = month.minusMonths(1); selected = null },
                         )
                         ToolbillIconButton(
-                            icon = Icons.Rounded.ChevronRight,
+                            icon = ToolbillIcons.ChevronRight,
                             contentDescription = "Next month",
                             onClick = { month = month.plusMonths(1); selected = null },
                         )
@@ -162,7 +182,7 @@ fun CalendarScreen(
                 Spacer(Modifier.height(6.dp))
             Text(
                 text = "${MoneyFormat.symbol(monthTotal, home)} charged this month · " +
-                    "$chargeCount charges",
+                    "$chargeCount " + if (chargeCount == 1) "charge" else "charges",
                 style = Toolbill.money.code,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -174,6 +194,7 @@ fun CalendarScreen(
         ) {
         item {
             MonthGrid(
+                homeCurrency = homeCurrency,
                 month = month,
                 today = today,
                 selected = selected,
@@ -183,7 +204,7 @@ fun CalendarScreen(
                 onSelect = { selected = it },
             )
             Spacer(Modifier.height(Space.s3))
-            IntensityLegend()
+            IntensityLegend(homeCurrency)
             Spacer(Modifier.height(Space.s4))
             HorizontalDivider(color = Toolbill.stateColors.dividerDense)
         }
@@ -252,6 +273,7 @@ private fun MonthGrid(
     charges: Map<LocalDate, DayCharges>,
     overdueDates: Set<LocalDate>,
     trialDates: Set<LocalDate>,
+    homeCurrency: String,
     onSelect: (LocalDate) -> Unit,
 ) {
     // Week starts Monday, as the design's M T W T F S S header does.
@@ -299,6 +321,7 @@ private fun MonthGrid(
                         date = date,
                         tone = tone,
                         totalMinor = total,
+                        homeCurrency = homeCurrency,
                         modifier = Modifier.weight(1f),
                         onClick = { onSelect(date) },
                     )
@@ -313,6 +336,7 @@ private fun DayCell(
     date: LocalDate,
     tone: DayTone,
     totalMinor: Long,
+    homeCurrency: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -361,7 +385,7 @@ private fun DayCell(
                 totalMinor > 0 -> {
                     Spacer(Modifier.height(9.dp))
                     ChargeDots(
-                        count = dotCount(totalMinor),
+                        count = dotCount(totalMinor, homeCurrency),
                         color = if (tone == DayTone.PLAIN) scheme.outline else content,
                     )
                 }
@@ -381,12 +405,19 @@ private fun ChargeDots(count: Int, color: Color) {
 }
 
 @Composable
-private fun IntensityLegend() {
+private fun IntensityLegend(homeCurrency: String) {
+    val (low, high) = bandsFor(homeCurrency)
+    val labels = listOf(
+        1 to "<" + MoneyFormat.symbolWhole(low, homeCurrency),
+        2 to MoneyFormat.symbolWhole(low, homeCurrency) + "–" +
+            MoneyFormat.symbolWhole(high, homeCurrency),
+        3 to MoneyFormat.symbolWhole(high, homeCurrency) + "+",
+    )
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Space.s4),
         horizontalArrangement = Arrangement.spacedBy(Space.s4),
     ) {
-        listOf(1 to "<₹1k", 2 to "₹1–3k", 3 to "₹3k+").forEach { (dots, label) ->
+        labels.forEach { (dots, label) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ChargeDots(dots, MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.size(Space.s2))

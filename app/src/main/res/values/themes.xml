@@ -5,5 +5,5 @@
       frame before the first composition, so it must track night mode or the launch flashes
       the wrong colour.
     -->
-    <style name="Theme.Toolbill" parent="@android:style/Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Toolbill" parent="Theme.AppCompat.Light.NoActionBar" />
 </resources>

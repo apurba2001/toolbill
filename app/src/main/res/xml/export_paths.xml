@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the export staging directory is shared, and only that.
+  A FileProvider rooted at the cache directory would expose everything else the app keeps there
+  to any component holding a URI grant.
+-->
+<paths>
+    <cache-path name="export" path="export/" />
+</paths>

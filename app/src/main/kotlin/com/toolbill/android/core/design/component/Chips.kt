@@ -53,16 +53,17 @@ fun ToolbillFilterChip(
     selected: Boolean,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    showCheckmark: Boolean = true,
     onClick: () -> Unit = {},
 ) {
     val scheme = MaterialTheme.colorScheme
     val container = when {
-        selected -> scheme.primaryContainer
+        selected -> scheme.primary
         else -> Color.Transparent
     }
     val content = when {
         !enabled -> scheme.outline
-        selected -> scheme.onPrimaryContainer
+        selected -> scheme.onPrimary
         else -> scheme.onSurface
     }
     val outline = when {
@@ -79,7 +80,7 @@ fun ToolbillFilterChip(
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (selected) {
+            if (selected && showCheckmark) {
                 CheckMark(color = content)
                 Spacer(Modifier.width(5.dp))
             }
@@ -160,12 +161,18 @@ fun SortSelector(
      */
     height: androidx.compose.ui.unit.Dp = 34.dp,
     textStyle: androidx.compose.ui.text.TextStyle = ToolbillText.chip,
+    /**
+     * Equal segments spanning the available width — the shape everywhere the control is the
+     * only thing on its row. `false` sizes each segment to its label, for the one place it
+     * shares a row with a caption. It defaults to the common case: an un-weighted Row of
+     * segments in an unbounded parent overflows and clips its last option.
+     */
+    fillWidth: Boolean = true,
     onSelect: (Int) -> Unit = {},
 ) {
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier = modifier
-            .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
             .height(height)
             .clip(ChipShape)
@@ -183,16 +190,17 @@ fun SortSelector(
             }
             Box(
                 modifier = Modifier
-                    .weight(1f)
                     .height(height)
-                    .background(if (selected) scheme.primaryContainer else Color.Transparent)
-                    .clickable { onSelect(index) },
+                    .then(if (fillWidth) Modifier.weight(1f) else Modifier)
+                    .background(if (selected) scheme.primary else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = option,
                     style = textStyle,
-                    color = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+                    color = if (selected) scheme.onPrimary else scheme.onSurface,
                 )
             }
         }

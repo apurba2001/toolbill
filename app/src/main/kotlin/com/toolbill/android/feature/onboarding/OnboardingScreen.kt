@@ -1,20 +1,29 @@
 package com.toolbill.android.feature.onboarding
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,11 +42,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.toolbill.android.core.design.IbmPlexMono
-import com.toolbill.android.core.design.W450
 import com.toolbill.android.core.design.IbmPlexSans
 import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Toolbill
 import com.toolbill.android.core.design.ToolbillText
+import com.toolbill.android.core.design.W450
 import com.toolbill.android.core.design.component.SortSelector
 import com.toolbill.android.core.design.component.ToolbillActionButton
 import com.toolbill.android.core.design.component.ToolbillActionTextButton
@@ -156,16 +165,22 @@ private fun Rule() {
 @Composable
 fun OnboardingScreen(
     modifier: Modifier = Modifier,
+    initialCurrency: String = "INR",
+    onHomeCurrency: (String) -> Unit = {},
     onFinish: () -> Unit = {},
     onAddManually: () -> Unit = {},
 ) {
     var step by remember { mutableIntStateOf(0) }
-    var currencyIndex by remember { mutableIntStateOf(0) }
+    // Starts on whatever the device region implies, so the first screen already shows the
+    // answer the copy claims it detected.
+    var currencyIndex by remember {
+        mutableIntStateOf(currencies.indexOfFirst { it.code == initialCurrency }.coerceAtLeast(0))
+    }
     var splitIndex by remember { mutableIntStateOf(0) }
     var defaultBusiness by remember { mutableStateOf(true) }
     var trackFx by remember { mutableStateOf(true) }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -179,18 +194,35 @@ fun OnboardingScreen(
             )
             Spacer(Modifier.height(14.dp))
 
-            when (step) {
-                0 -> CurrencyStep(currencyIndex) { currencyIndex = it }
-                1 -> SplitStep(
-                    splitIndex = splitIndex,
-                    defaultBusiness = defaultBusiness,
-                    trackFx = trackFx,
-                    onSplit = { splitIndex = it },
-                    onDefaultBusiness = { defaultBusiness = it },
-                    onTrackFx = { trackFx = it },
-                )
+            AnimatedContent(
+                targetState = step,
+                transitionSpec = {
+                    val isForward = targetState > initialState
+                    if (isForward) {
+                        (slideInHorizontally(tween(220)) { it } + fadeIn(tween(150)))
+                            .togetherWith(slideOutHorizontally(tween(220)) { -it / 10 } + fadeOut(tween(100)))
+                    } else {
+                        (slideInHorizontally(tween(220)) { -it / 10 } + fadeIn(tween(150)))
+                            .togetherWith(slideOutHorizontally(tween(220)) { it } + fadeOut(tween(100)))
+                    }
+                },
+                label = "onboardingStep",
+            ) { current ->
+                Column {
+                    when (current) {
+                        0 -> CurrencyStep(currencyIndex) { currencyIndex = it }
+                        1 -> SplitStep(
+                            splitIndex = splitIndex,
+                            defaultBusiness = defaultBusiness,
+                            trackFx = trackFx,
+                            onSplit = { splitIndex = it },
+                            onDefaultBusiness = { defaultBusiness = it },
+                            onTrackFx = { trackFx = it },
+                        )
 
-                else -> FirstEntryStep()
+                        else -> FirstEntryStep()
+                    }
+                }
             }
             Spacer(Modifier.height(Gutter))
         }
@@ -207,7 +239,9 @@ fun OnboardingScreen(
             when (step) {
                 0 -> ToolbillActionButton(
                     text = "Continue",
-                    onClick = { step++ },
+                    // Committed on leaving the step rather than on every tap: the answer is
+                    // what the user moved forward with, not what they brushed past.
+                    onClick = { onHomeCurrency(currencies[currencyIndex].code); step++ },
                     modifier = Modifier.weight(1f),
                 )
 

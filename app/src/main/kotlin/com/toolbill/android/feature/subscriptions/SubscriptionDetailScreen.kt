@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.toolbill.android.core.design.ToolbillIcons
+import com.toolbill.android.core.domain.subscription.PricedSubscription
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -29,9 +33,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.foundation.border
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,6 +43,7 @@ import com.toolbill.android.core.design.component.StatRow
 import com.toolbill.android.core.design.component.ScreenHeader
 import com.toolbill.android.core.design.component.ToolbillIconButton
 import com.toolbill.android.core.design.component.ToolbillDestructiveTextButton
+import com.toolbill.android.core.design.component.ToolbillOutlinedButton
 import com.toolbill.android.core.design.component.ToolbillTextButton
 import com.toolbill.android.core.design.EyebrowStyle
 import com.toolbill.android.core.design.Space
@@ -51,44 +53,57 @@ import com.toolbill.android.core.design.component.Stat
 import com.toolbill.android.core.design.component.StatBadgeRow
 import com.toolbill.android.core.domain.money.MoneyFormat
 import com.toolbill.android.core.domain.money.normalizedMonthlyMinor
+import com.toolbill.android.core.domain.subscription.Charge
+import com.toolbill.android.core.domain.subscription.SubscriptionStatus
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/**
- * One recorded charge.
- *
- * [fxRate] is null for charges the user backfilled from before install. We do not invent a
- * rate, and those rows stay out of the drift figure entirely.
- */
-data class ChargeHistoryEntry(
-    val date: String,
-    val amountMinor: Long,
-    val fxRate: String?,
-    val note: String? = null,
-)
+private val chargeDateFormat = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private val sinceFormat = DateTimeFormatter.ofPattern("MMM yy", Locale.ENGLISH)
 
-private val sampleHistory = listOf(
-    ChargeHistoryEntry("27 Jul 2026", 172_840, "86.42"),
-    ChargeHistoryEntry("27 Jun 2026", 171_800, "85.90"),
-    ChargeHistoryEntry("27 May 2026", 170_220, "85.11"),
-    ChargeHistoryEntry("27 Apr 2026", 169_200, "84.60", note = "first capture"),
-    ChargeHistoryEntry("27 Mar 2026", 168_000, null, note = "backfilled"),
-    ChargeHistoryEntry("27 Feb 2026", 0, null, note = "backfilled"),
-)
+/** How many charges the history shows before it offers the rest. */
+private const val HISTORY_PREVIEW = 6
 
 @Composable
 fun SubscriptionDetailScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    priced: PricedSubscription = SampleData.claude,
+    priced: PricedSubscription,
+    charges: List<Charge> = emptyList(),
+    homeCurrency: String = "INR",
+    today: LocalDate = LocalDate.now(),
     onBack: () -> Unit = {},
     onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onMarkCancelled: () -> Unit = {},
 ) {
-    val home = SampleData.HOME_CURRENCY
+    val home = homeCurrency
     val subscription = priced.subscription
     var confirmingDelete by remember { mutableStateOf(false) }
+    var showAllCharges by remember { mutableStateOf(false) }
+
+    // Only charges carrying a captured home figure can be summed or plotted. A row without one
+    // is still shown -- it happened -- but as a dash, never converted at a rate that was not in
+    // force when it was taken.
+    //
+    // A skipped charge is excluded as well. It carries a real, known home figure of zero, so it
+    // would sum and plot happily -- as a total dragged below what was actually paid and a drift
+    // line dropping to the floor on a month nothing was billed.
+    val captured = remember(charges) {
+        charges.filter { it.captured && it.countsTowardSpend }
+    }
+    val capturedTotal = remember(captured) { captured.sumOf { it.homeAmountMinor } }
+    val firstCharge = remember(charges) { charges.minByOrNull { it.dueDate }?.dueDate }
+    // Drift needs at least two different captured figures. With one, the chart would be a flat
+    // line implying a stability nothing has measured.
+    val driftPoints = remember(captured) {
+        captured.sortedBy { it.dueDate }.map { it.homeAmountMinor }
+    }
+    val hasDrift = driftPoints.distinct().size >= 2
 
     val row = subscription.toRowUi(
-        today = SampleData.today,
+        today = today,
         homeCurrency = home,
         homeAmountMinor = priced.homeAmountMinor,
         overdueSince = priced.overdueSince,
@@ -106,6 +121,8 @@ fun SubscriptionDetailScreen(
         append(subscription.categoryLabel.uppercase(Locale.ENGLISH))
     }
 
+    val visibleCharges = if (showAllCharges) charges else charges.take(HISTORY_PREVIEW)
+
     val listState = rememberLazyListState()
     // The bar shows actions only until the 24sp name scrolls under it, then adopts the name.
     val headerScroll = rememberHeaderScroll(listState, titleRevealPx = 92)
@@ -116,9 +133,13 @@ fun SubscriptionDetailScreen(
             onBack = onBack,
             scroll = headerScroll,
         ) {
-            ToolbillTextButton(text = "Edit", onClick = onEdit)
+            ToolbillTextButton(
+                text = "Edit",
+                onClick = onEdit,
+                modifier = Modifier.offset(x = 10.dp)
+            )
             ToolbillIconButton(
-                icon = Icons.Rounded.MoreVert,
+                icon = ToolbillIcons.More,
                 contentDescription = "More actions",
                 onClick = {},
             )
@@ -147,27 +168,28 @@ fun SubscriptionDetailScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(8.dp))
-                // Mono at 36sp for the figure only; the qualifier stays at body size on the
-                // same baseline, or the header wraps to two lines and swamps the screen.
                 // Code, figure, minor unit and qualifier all share one baseline; only the
-                // figure is 36sp, so the row reads as a single number with annotations.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // figure is 36sp, so the row reads as a single number with annotations rather
+                // than as one long run of digits.
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = detailAmount.code,
                         style = Toolbill.money.heroCode,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.alignByBaseline(),
                     )
-                    Row {
+                    // Nested so the minor unit sits hard against the figure: the 4dp the outer
+                    // row spaces its annotations by would read as a gap inside the number.
+                    Row(modifier = Modifier.alignByBaseline()) {
                         Text(
                             text = detailAmount.integer,
                             style = Toolbill.money.detailHeader,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.alignByBaseline(),
                         )
-                        detailAmount.fraction?.let {
+                        if (detailAmount.fraction != null) {
                             Text(
-                                text = detailAmount.decimalSeparator + it,
+                                text = detailAmount.decimalSeparator + detailAmount.fraction,
                                 style = Toolbill.money.detailFraction,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.alignByBaseline(),
@@ -175,7 +197,7 @@ fun SubscriptionDetailScreen(
                         }
                     }
                     Text(
-                        text = "/ month" + if (foreignBilled) " · $originalAmount" else "",
+                        text = "/ month" + if (foreignBilled) " \u00B7 $originalAmount" else "",
                         style = ToolbillText.detailQualifier,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.alignByBaseline(),
@@ -188,9 +210,12 @@ fun SubscriptionDetailScreen(
             Spacer(Modifier.height(16.dp))
             StatRow(
                 stats = listOf(
-                    Stat("PAID · CAPTURED", MoneyFormat.format(684_060, home).plain),
-                    Stat("CHARGES", "4 + 7"),
-                    Stat("SINCE", "Oct 25"),
+                    Stat(
+                        "PAID · CAPTURED",
+                        if (captured.isEmpty()) "—" else MoneyFormat.format(capturedTotal, home).plain,
+                    ),
+                    Stat("CHARGES", charges.size.toString()),
+                    Stat("SINCE", firstCharge?.format(sinceFormat) ?: "—"),
                 ),
             )
         }
@@ -218,34 +243,61 @@ fun SubscriptionDetailScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
-                    Text(
-                        text = "+3.0% since 27 Apr",
-                        style = Toolbill.money.code,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    if (hasDrift) {
+                        Text(
+                            text = driftLabel(driftPoints),
+                            style = Toolbill.money.code,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
-                FxSparkline()
-                Spacer(Modifier.height(4.dp))
-                Row(Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "₹1,692.00 · 27 Apr 26",
-                        style = Toolbill.money.code.copy(fontSize = 9.5.sp),
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.weight(1f),
+                if (hasDrift) {
+                    val first = captured.minByOrNull { it.dueDate }!!
+                    val last = captured.maxByOrNull { it.dueDate }!!
+                    FxSparkline(
+                        points = driftPoints,
+                        spoken = "Cost rose from " +
+                            "${MoneyFormat.symbol(first.homeAmountMinor, home)} in " +
+                            "${first.dueDate.format(sinceFormat)} to " +
+                            "${MoneyFormat.symbol(last.homeAmountMinor, home)} in " +
+                            last.dueDate.format(sinceFormat),
                     )
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "${MoneyFormat.symbol(first.homeAmountMinor, home)} \u00B7 " +
+                                first.dueDate.format(sinceFormat),
+                            style = Toolbill.money.code.copy(fontSize = 9.5.sp),
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "${MoneyFormat.symbol(last.homeAmountMinor, home)} \u00B7 " +
+                                last.dueDate.format(sinceFormat),
+                            style = Toolbill.money.code.copy(fontSize = 9.5.sp),
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                } else {
                     Text(
-                        text = "₹1,742.00 · 27 Aug 26",
-                        style = Toolbill.money.code.copy(fontSize = 9.5.sp),
+                        text = "No movement recorded yet.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
                 }
             }
             Spacer(Modifier.height(Space.s2))
             Text(
-                text = "Starts at the first rate Toolbill captured itself — install day, " +
-                    "12 Apr 2026. Nothing before that is drawn, because nothing before that " +
-                    "was measured.",
+                // The spoken version of the chart lives on FxSparkline's semantics, not here.
+                text = if (hasDrift) {
+                    "Starts at the first rate Toolbill captured itself. Nothing before that is " +
+                        "drawn, because nothing before that was measured."
+                } else {
+                    "A line appears once Toolbill has recorded this charge at two different " +
+                        "rates. Nothing before the first capture is drawn, because nothing " +
+                        "before it was measured."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.s4),
@@ -263,7 +315,20 @@ fun SubscriptionDetailScreen(
             HorizontalDivider(color = Toolbill.stateColors.dividerDense)
         }
 
-        items(sampleHistory, key = { it.date }) { entry ->
+        if (charges.isEmpty()) {
+            item {
+                Text(
+                    text = "No charges recorded yet. Toolbill writes one down each time this " +
+                        "subscription falls due — the next is " +
+                        "${row.supportLine.lowercase(Locale.ENGLISH)}.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Space.s4, vertical = Space.s3),
+                )
+            }
+        }
+
+        itemsIndexed(visibleCharges, key = { _, charge -> charge.id }) { index, charge ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,46 +337,55 @@ fun SubscriptionDetailScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = entry.date,
+                        text = charge.dueDate.format(chargeDateFormat),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = listOfNotNull(
-                            entry.note,
-                            entry.fxRate?.let { "rate $it" } ?: "rate —",
-                        ).joinToString(" · "),
+                        text = if (charge.captured) {
+                            MoneyFormat.format(charge.amountMinor, charge.currency)
+                                .let { "${it.code} ${it.plain}" }
+                        } else {
+                            "not captured"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
-                    text = if (entry.amountMinor == 0L) {
-                        "—"
+                    text = if (charge.captured) {
+                        MoneyFormat.format(charge.homeAmountMinor, home).plain
                     } else {
-                        MoneyFormat.format(entry.amountMinor, home).plain
+                        "\u2014"
                     },
                     style = Toolbill.money.row,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (charge.captured) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    },
                 )
             }
-            HorizontalDivider(color = Toolbill.stateColors.dividerDense)
+            if (index < visibleCharges.lastIndex) {
+                HorizontalDivider(color = Toolbill.stateColors.dividerDense)
+            }
         }
 
-        item {
-            ToolbillTextButton(
-                text = "Show all 11 charges",
-                onClick = {},
-                modifier = Modifier.padding(horizontal = Space.s2),
-            )
-            Text(
-                text = "4 captured by Toolbill · 7 backfilled by you before install. " +
-                    "Backfilled rows carry no rate — we don't invent one, and they stay out " +
-                    "of the drift figure.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Space.s4),
-            )
+        if (charges.size > HISTORY_PREVIEW) {
+            item {
+                ToolbillTextButton(
+                    text = if (showAllCharges) {
+                        "Show fewer"
+                    } else {
+                        "Show all ${charges.size} charges"
+                    },
+                    onClick = { showAllCharges = !showAllCharges },
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+                Spacer(Modifier.height(Space.s6))
+            }
+        } else {
+            item { Spacer(Modifier.height(Space.s6)) }
         }
 
         item {
@@ -320,7 +394,10 @@ fun SubscriptionDetailScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Space.s2),
                 horizontalArrangement = Arrangement.spacedBy(Space.s2),
             ) {
-                ToolbillTextButton(text = "Mark cancelled", onClick = {})
+                // Only offered while there is something to cancel.
+                if (subscription.status != SubscriptionStatus.CANCELLED) {
+                    ToolbillOutlinedButton(text = "Mark cancelled", onClick = onMarkCancelled)
+                }
                 ToolbillDestructiveTextButton(
                     text = "Delete",
                     onClick = { confirmingDelete = true },
@@ -334,9 +411,25 @@ fun SubscriptionDetailScreen(
     if (confirmingDelete) {
         DeleteConfirmation(
             name = subscription.name,
+            chargeCount = charges.size,
+            capturedTotal = capturedTotal,
+            homeCurrency = home,
             onDismiss = { confirmingDelete = false },
+            onConfirm = { confirmingDelete = false; onDelete() },
+            onMarkCancelled = { confirmingDelete = false; onMarkCancelled() },
         )
     }
+}
+
+/** "+3.0%" between the first and last captured figures. */
+private fun driftLabel(points: List<Long>): String {
+    val first = points.first()
+    val last = points.last()
+    if (first == 0L) return ""
+    val tenths = (last - first) * 1000 / first
+    val sign = if (tenths >= 0) "+" else "\u2212"
+    val magnitude = kotlin.math.abs(tenths)
+    return "$sign${magnitude / 10}.${magnitude % 10}%"
 }
 
 /**
@@ -347,53 +440,130 @@ fun SubscriptionDetailScreen(
  * option spelled out in the figures it would destroy.
  */
 @Composable
-private fun DeleteConfirmation(name: String, onDismiss: () -> Unit) {
-    AlertDialog(
+private fun DeleteConfirmation(
+    name: String,
+    chargeCount: Int,
+    capturedTotal: Long,
+    homeCurrency: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    onMarkCancelled: () -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete $name?") },
-        text = {
-            Text(
-                "This removes the subscription and all 11 recorded charges — ₹19,004 of " +
-                    "history that your CSV export uses. Marking it cancelled instead keeps " +
-                    "the record for tax purposes.",
-            )
-        },
-        dismissButton = {
-            Row {
-                ToolbillTextButton(text = "Cancel", onClick = onDismiss)
-                ToolbillTextButton(text = "Mark cancelled", onClick = onDismiss)
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        androidx.compose.material3.Surface(
+            shape = Radius.lg,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Delete $name?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    // The cost of the destructive option, in the figures it would destroy.
+                    text = if (chargeCount == 0) {
+                        "This removes the subscription. Nothing has been charged against it " +
+                            "yet, so no history is lost. Marking it cancelled instead keeps it " +
+                            "in your records for tax purposes."
+                    } else {
+                        "This removes the subscription and all $chargeCount recorded " +
+                            (if (chargeCount == 1) "charge" else "charges") + " \u2014 " +
+                            "${MoneyFormat.symbolWhole(capturedTotal, homeCurrency)} of history " +
+                            "that your CSV export uses. Marking it cancelled instead keeps the " +
+                            "record for tax purposes."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    ToolbillTextButton(
+                        text = "Cancel",
+                        onClick = onDismiss,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    androidx.compose.material3.TextButton(
+                        onClick = onMarkCancelled,
+                        shape = Radius.md,
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    ) {
+                        Text(
+                            text = "Mark\ncancelled",
+                            style = ToolbillText.button,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                    ToolbillDestructiveTextButton(
+                        text = "Delete",
+                        onClick = onConfirm
+                    )
+                }
             }
-        },
-        confirmButton = {
-            ToolbillDestructiveTextButton(text = "Delete", onClick = onDismiss)
-        },
-    )
+        }
+    }
 }
 
 @Composable
-private fun FxSparkline() {
-    val points = listOf(0.0f, 0.22f, 0.55f, 0.78f, 1.0f)
+private fun FxSparkline(points: List<Long>, spoken: String) {
+    // Normalised to the observed range, so the shape shows the movement rather than the
+    // distance from zero -- a 3% rise plotted from zero is a flat line.
+    val low = points.min()
+    val high = points.max()
+    val span = (high - low).coerceAtLeast(1L).toFloat()
+    val normalised = points.map { (it - low) / span }
     val line = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outlineVariant
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Space.s4)
             .height(56.dp)
-            .semantics {
-                contentDescription = "Rate rose from ₹1,692 in April to ₹1,742 in August, " +
-                    "up 3.0 percent"
-            },
+            .semantics { contentDescription = spoken },
     ) {
-        val stepX = size.width / (points.size - 1)
-        points.forEachIndexed { index, value ->
+        if (normalised.size < 2) return@Canvas
+        val stepX = size.width / (normalised.size - 1)
+        val firstY = size.height * (1f - normalised[0]) * 0.9f
+        
+        // Vertical dashed line at the start
+        drawLine(
+            color = outline,
+            start = Offset(1.dp.toPx(), 0f),
+            end = Offset(1.dp.toPx(), firstY),
+            strokeWidth = 1.dp.toPx(),
+            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+        )
+
+        normalised.forEachIndexed { index, value ->
             if (index == 0) return@forEachIndexed
             drawLine(
                 color = line,
-                start = Offset((index - 1) * stepX, size.height * (1f - points[index - 1]) * 0.9f),
+                start = Offset((index - 1) * stepX, size.height * (1f - normalised[index - 1]) * 0.9f),
                 end = Offset(index * stepX, size.height * (1f - value) * 0.9f),
                 strokeWidth = 2.dp.toPx(),
                 cap = StrokeCap.Round,
             )
         }
+        
+        // Dot at the end
+        val lastY = size.height * (1f - points.last()) * 0.9f
+        drawCircle(
+            color = line,
+            radius = 3.dp.toPx(),
+            center = Offset(size.width - 3.dp.toPx(), lastY)
+        )
     }
 }

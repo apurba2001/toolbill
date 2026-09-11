@@ -3,4 +3,7 @@
     <string name="app_name">Toolbill</string>
     <string name="widget_name">Monthly burn</string>
     <string name="widget_description">Your normalized monthly spend and the next renewals.</string>
+    <string name="shortcut_short_add">Add</string>
+    <string name="shortcut_long_add">Add Subscription</string>
+    <string name="tile_add_label">Add subscription</string>
 </resources>

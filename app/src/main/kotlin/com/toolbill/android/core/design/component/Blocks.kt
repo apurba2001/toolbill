@@ -120,9 +120,9 @@ fun SectionHeader(
         verticalAlignment = Alignment.Bottom,
     ) {
         Text(
-            text = title,
-            style = ToolbillText.sectionTitle,
-            color = MaterialTheme.colorScheme.onSurface,
+            text = title.uppercase(java.util.Locale.ROOT),
+            style = EyebrowStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (trailing != null) {
             Text(
@@ -145,12 +145,6 @@ data class Stat(val label: String, val value: String)
 @Composable
 fun StatRow(stats: List<Stat>, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = Space.s4)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(Toolbill.stateColors.dividerDense),
-        )
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -195,8 +189,15 @@ fun EmptyState(
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = Space.s4, vertical = Space.s12),
     ) {
-        HeroAmount(amountMinor = amountMinor, currency = currency)
-        Spacer(Modifier.height(Space.s6))
+        // The same component the populated screen uses, dimmed rather than replaced: a
+        // hardcoded "0.00" would drop the currency and jump the layout on the first entry.
+        HeroAmount(
+            amountMinor = amountMinor,
+            currency = currency,
+            alpha = 0.5f,
+            modifier = Modifier.padding(vertical = Space.s2),
+        )
+        Spacer(Modifier.height(Space.s4))
         Text(
             text = headline,
             style = MaterialTheme.typography.headlineSmall,
@@ -209,9 +210,9 @@ fun EmptyState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(Space.s6))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Space.s4)) {
             ToolbillButton(text = primaryAction, onClick = onPrimary)
-            ToolbillOutlinedButton(text = secondaryAction, onClick = onSecondary)
+            ToolbillTextButton(text = secondaryAction, onClick = onSecondary)
         }
     }
 }

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing leaves the device automatically.
+
+  Toolbill holds what someone pays for and when, which is a detailed picture of a person and
+  their business. Backup is offered explicitly, to the user's own Google Drive, as something they
+  turn on - not as a silent copy to a cloud backup or a device-transfer bundle they never asked
+  about. allowBackup is false for the same reason; these rules state it for Android 12 and above,
+  which reads them instead.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

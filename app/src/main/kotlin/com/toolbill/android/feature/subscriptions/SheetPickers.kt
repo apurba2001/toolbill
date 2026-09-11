@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
+import com.toolbill.android.core.design.ToolbillIcons
+import com.toolbill.android.core.design.component.ToolbillIconButton
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -133,16 +133,12 @@ fun CustomCycleContent(
 @Composable
 private fun StepHeader(title: String, onBack: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+        ToolbillIconButton(
+            icon = ToolbillIcons.Back,
             contentDescription = "Back to the form",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(onClick = onBack)
-                .size(20.dp),
+            onClick = onBack,
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(2.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,

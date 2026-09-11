@@ -1,5 +1,6 @@
 package com.toolbill.android.core.design.component
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,13 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.PauseCircleOutline
-import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,10 +17,11 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.toolbill.android.core.design.ToolbillIcons
 import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Space
 import com.toolbill.android.core.design.ToolbillText
@@ -34,7 +29,7 @@ import com.toolbill.android.core.design.ToolbillText
 /** One action offered by the long-press sheet. */
 data class RowAction(
     val label: String,
-    val icon: ImageVector,
+    @DrawableRes val icon: Int,
     val destructive: Boolean = false,
     val onClick: () -> Unit,
 )
@@ -90,7 +85,7 @@ fun RowActionSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = action.icon,
+                        painter = painterResource(action.icon),
                         contentDescription = null,
                         tint = tint,
                         modifier = Modifier.size(20.dp),
@@ -103,7 +98,12 @@ fun RowActionSheet(
     }
 }
 
-/** The six actions the design lists, in its order. */
+/**
+ * The six actions the design lists, in its order.
+ *
+ * [paused] swaps the third for Resume. The sheet opens on a row whose state the user can
+ * already read, and an action that cannot do anything is worse than one that is not offered.
+ */
 fun defaultRowActions(
     onMarkPaid: () -> Unit,
     onSkip: () -> Unit,
@@ -111,11 +111,16 @@ fun defaultRowActions(
     onDuplicate: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    paused: Boolean = false,
 ): List<RowAction> = listOf(
-    RowAction("Mark paid", Icons.Rounded.TaskAlt, onClick = onMarkPaid),
-    RowAction("Skip this charge", Icons.Rounded.SkipNext, onClick = onSkip),
-    RowAction("Pause", Icons.Rounded.PauseCircleOutline, onClick = onPause),
-    RowAction("Duplicate", Icons.Rounded.ContentCopy, onClick = onDuplicate),
-    RowAction("Edit", Icons.Rounded.Edit, onClick = onEdit),
-    RowAction("Delete", Icons.Rounded.DeleteOutline, destructive = true, onClick = onDelete),
+    RowAction("Mark paid", ToolbillIcons.MarkPaid, onClick = onMarkPaid),
+    RowAction("Skip this charge", ToolbillIcons.Skip, onClick = onSkip),
+    RowAction(
+        label = if (paused) "Resume" else "Pause",
+        icon = if (paused) ToolbillIcons.Return else ToolbillIcons.Pause,
+        onClick = onPause,
+    ),
+    RowAction("Duplicate", ToolbillIcons.Duplicate, onClick = onDuplicate),
+    RowAction("Edit", ToolbillIcons.Edit, onClick = onEdit),
+    RowAction("Delete", ToolbillIcons.Delete, destructive = true, onClick = onDelete),
 )

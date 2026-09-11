@@ -12,14 +12,34 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.toolbill.android.UserSettings
+import com.toolbill.android.core.reminder.ReminderNotifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.ui.unit.sp
 import com.toolbill.android.core.design.component.rememberHeaderScroll
 import com.toolbill.android.core.design.component.ScreenHeader
 import com.toolbill.android.core.design.component.ToolbillIconButton
@@ -31,17 +51,6 @@ import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Space
 import com.toolbill.android.core.design.Toolbill
 
-/** One line of the self-check. [ok] false renders in the overdue colour, never as a scare. */
-data class SelfCheck(val label: String, val detail: String, val ok: Boolean)
-
-private val selfChecks = listOf(
-    SelfCheck("Notification permission", "granted", ok = true),
-    SelfCheck("Exact alarms", "allowed", ok = true),
-    SelfCheck("Battery optimization", "restricted", ok = false),
-    SelfCheck("Last reminder fired", "11 Aug, 09:00", ok = true),
-    SelfCheck("Widget last updated", "6 days ago", ok = false),
-)
-
 /**
  * The OEM diagnostic screen.
  *
@@ -52,9 +61,23 @@ private val selfChecks = listOf(
 @Composable
 fun ReminderDiagnosticScreen(
     modifier: Modifier = Modifier,
-    deviceName: String = "Xiaomi · HyperOS 2",
+    userSettings: UserSettings,
     onBack: () -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val deviceName = remember { detectedDevice() }
+    // Re-read on every resume: the whole point of the screen is to send the user into system
+    // settings and back, and a cached "restricted" after they fixed it is its own small lie.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var checks by remember { mutableStateOf(selfChecks(context, userSettings)) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) checks = selfChecks(context, userSettings)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val scrollState = rememberScrollState()
     val headerScroll = rememberHeaderScroll(offsetPx = { scrollState.value }, titleRevealPx = 72)
 
@@ -85,51 +108,73 @@ fun ReminderDiagnosticScreen(
             )
 
             Spacer(Modifier.height(Space.s6))
-            Row {
-                Text(
-                    text = "DETECTED DEVICE",
-                    style = EyebrowStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = deviceName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
+            OutlinedCard(
+                colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent),
+                border = BorderStroke(1.dp, Toolbill.stateColors.dividerDense),
+                shape = Radius.md,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    // Stacked, not a label/value row. Real device names run to "Google
+                    // sdk_gphone64_x86_64 - Android 17", which took the whole width and left
+                    // the eyebrow wrapping one letter per line down the side of the card.
+                    Column {
+                        Text(
+                            text = "DETECTED DEVICE",
+                            style = EyebrowStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = deviceName,
+                            style = Toolbill.money.code.copy(fontSize = 12.sp),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
 
-            Spacer(Modifier.height(Space.s6))
-            Text(
-                text = "Two settings to change",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(Space.s2))
-            NumberedStep("1", "Set battery saver for Toolbill to No restrictions.")
-            NumberedStep("2", "Turn on Autostart so reminders survive a reboot.")
+                    Spacer(Modifier.height(Space.s6))
+                    Text(
+                        text = "Two settings to change",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(Space.s2))
+                    NumberedStep("1", "Set battery saver for Toolbill to No restrictions.")
+                    NumberedStep("2", "Turn on Autostart so reminders survive a reboot.")
 
-            Spacer(Modifier.height(Space.s3))
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
-                ToolbillButton(text = "Open battery settings", onClick = {})
-                ToolbillOutlinedButton(text = "Autostart", onClick = {})
+                    Spacer(Modifier.height(Space.s4))
+                    // Stacked: "Open battery settings" and "Notifications" do not fit on one
+                    // line at 400dp, and the outlined one broke mid-word.
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.s2)) {
+                        ToolbillButton(
+                            text = "Open battery settings",
+                            onClick = { openBatterySettings(context) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        ToolbillOutlinedButton(
+                            text = "Notification settings",
+                            onClick = { openNotificationSettings(context) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Spacer(Modifier.height(Space.s4))
+                    Text(
+                        text = "Opens this app's own page in system settings. Manufacturer " +
+                            "menus differ, so the autostart toggle may sit a level deeper.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Spacer(Modifier.height(Space.s2))
-            Text(
-                text = "Deep-links to the OEM screen. If it isn't available on your build, we show " +
-                    "the standard Android battery page instead.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
             Spacer(Modifier.height(Space.s8))
             Text(
-                text = "Self-check",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = "SELF-CHECK",
+                style = EyebrowStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Space.s2))
-            selfChecks.forEach { check ->
+            checks.forEach { check ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = Space.s2),
                     verticalAlignment = Alignment.CenterVertically,
@@ -144,7 +189,7 @@ fun ReminderDiagnosticScreen(
                         text = check.detail,
                         style = Toolbill.money.rowSecondary,
                         color = if (check.ok) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            Toolbill.stateColors.trial.content
                         } else {
                             Toolbill.stateColors.overdue.content
                         },
@@ -153,33 +198,67 @@ fun ReminderDiagnosticScreen(
                 HorizontalDivider(color = Toolbill.stateColors.dividerDense)
             }
 
-            Spacer(Modifier.height(Space.s4))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "Send yourself a test reminder",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "Arrives in 60 seconds. If it doesn't, the settings above are " +
-                            "still blocking it.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                ToolbillOutlinedButton(text = "Send test", onClick = {})
+            Spacer(Modifier.height(Space.s6))
+            Column {
+                Text(
+                    text = "Send yourself a test reminder",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "Arrives immediately, down the same path a renewal reminder takes. " +
+                        "If it does not appear, the settings above are blocking delivery " +
+                        "rather than scheduling.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Space.s3))
+                ToolbillOutlinedButton(
+                    text = "Send test",
+                    onClick = {
+                        ReminderNotifier.notifyTest(context)
+                        checks = selfChecks(context, userSettings)
+                    },
+                    // Nothing to prove while notifications are off, and the row above already
+                    // says so. Offering the button anyway would send a test that silently
+                    // vanishes -- the exact failure this screen exists to catch.
+                    enabled = ReminderNotifier.canNotify(context),
+                )
             }
 
             Spacer(Modifier.height(Space.s6))
-            Text(
-                text = "The widget is frozen by the same policy. Glance refreshes through " +
-                    "WorkManager, so a restricted app shows a stale burn figure with no warning — " +
-                    "6 days ago above is the tell. Fixing battery access fixes both.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(Space.s2))
+            OutlinedCard(
+                colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent),
+                border = BorderStroke(1.dp, Toolbill.stateColors.dividerDense),
+                shape = Radius.md,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val widgetAge = checks.lastOrNull()?.detail ?: "never"
+                val annotatedText = buildAnnotatedString {
+                    append(
+                        "The widget is frozen by the same policy. Glance refreshes through " +
+                            "WorkManager, so a restricted app shows a stale burn figure with no " +
+                            "warning — ",
+                    )
+                    withStyle(
+                        SpanStyle(
+                            fontWeight = FontWeight.Bold,
+                            color = Toolbill.stateColors.overdue.content,
+                        ),
+                    ) {
+                        append(widgetAge)
+                    }
+                    append(" above is the tell. Fixing battery access fixes both.")
+                }
+                Text(
+                    text = annotatedText,
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(Space.s4))
             Text(
                 text = "Also seen on Oppo, Vivo, OnePlus (App auto-launch) and Samsung " +
                     "(Sleeping apps). The guidance changes to match your device.",

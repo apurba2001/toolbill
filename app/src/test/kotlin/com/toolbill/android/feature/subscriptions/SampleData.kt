@@ -1,26 +1,20 @@
 package com.toolbill.android.feature.subscriptions
 
+import com.toolbill.android.core.domain.subscription.PricedSubscription
 import com.toolbill.android.core.domain.subscription.BillingCycle
 import com.toolbill.android.core.domain.subscription.Category
 import com.toolbill.android.core.domain.subscription.Subscription
 import com.toolbill.android.core.domain.subscription.SubscriptionStatus
 import java.time.LocalDate
 
-/**
- * A subscription paired with what its charge currently costs in the home currency.
- *
- * The home figure is carried alongside rather than on the entity, because it is derived from
- * today's rate and changes without the subscription changing.
- */
-data class PricedSubscription(
-    val subscription: Subscription,
-    val homeAmountMinor: Long,
-    val overdueSince: LocalDate? = null,
-)
+
 
 /**
- * The exact worked example from the design document, so the screens can be checked against it
- * figure by figure. Replaced by the repository once Room lands.
+ * The exact worked example from the design document.
+ *
+ * Test fixture only — it lives in the test source set so it cannot ship in the APK and cannot
+ * be reached from a screen by accident. Every screen now reads the repository; this is what
+ * the domain calculations are checked against, figure by figure.
  */
 object SampleData {
 

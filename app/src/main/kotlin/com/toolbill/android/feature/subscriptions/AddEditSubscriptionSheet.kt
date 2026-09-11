@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,12 +30,20 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.toolbill.android.core.design.ToolbillIcons
 import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Toolbill
 import com.toolbill.android.core.design.ToolbillText
@@ -47,33 +56,23 @@ import com.toolbill.android.core.design.component.ToolbillOutlinedButton
 import com.toolbill.android.core.design.component.ToolbillSelectField
 import com.toolbill.android.core.design.component.ToolbillTextButton
 import com.toolbill.android.core.design.component.ToolbillTextField
+import com.toolbill.android.core.domain.money.MoneyFormat
 import com.toolbill.android.core.domain.subscription.BillingCycle
+import com.toolbill.android.core.domain.subscription.CatalogueEntry
+import com.toolbill.android.core.domain.subscription.Category
+import com.toolbill.android.core.domain.subscription.catalogueCategoryFor
+import com.toolbill.android.core.domain.subscription.suggestServices
+import com.toolbill.android.core.domain.subscription.Subscription
+import com.toolbill.android.core.domain.subscription.SubscriptionStatus
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import com.toolbill.android.core.domain.subscription.Subscription
+import java.util.UUID
 
 /** Which step the sheet is showing. The sheet itself never stacks. */
 private enum class SheetStep { Form, Cycle, Currency }
-
-/** A bundled catalogue entry. Never carries an amount — see [AddEditSubscriptionSheet]. */
-data class CatalogueEntry(
-    val name: String,
-    val currency: String,
-    val cycle: BillingCycle,
-    val category: String,
-)
-
-private val catalogue = listOf(
-    CatalogueEntry("Claude Pro", "USD", BillingCycle.MONTHLY, "AI tools"),
-    CatalogueEntry("Claude Max", "USD", BillingCycle.MONTHLY, "AI tools"),
-    CatalogueEntry("Adobe Creative Cloud", "USD", BillingCycle.ANNUAL, "Design"),
-    CatalogueEntry("AWS", "USD", BillingCycle.MONTHLY, "Hosting & infra"),
-    CatalogueEntry("Figma Professional", "USD", BillingCycle.MONTHLY, "Design"),
-    CatalogueEntry("Google Workspace", "INR", BillingCycle.MONTHLY, "Productivity"),
-    CatalogueEntry("Shopify Basic", "INR", BillingCycle.MONTHLY, "Other"),
-    CatalogueEntry("Vercel Pro", "USD", BillingCycle.MONTHLY, "Hosting & infra"),
-    CatalogueEntry("Notion Plus", "USD", BillingCycle.MONTHLY, "Productivity"),
-)
 
 private val cyclePresets = listOf(
     "Monthly" to BillingCycle.MONTHLY,
@@ -82,9 +81,9 @@ private val cyclePresets = listOf(
     "Weekly" to BillingCycle.WEEKLY,
 )
 
-// One segmented control with a trailing "Custom" segment, not five loose chips. Named
-// rather than an ellipsis: it opens a step, and an ellipsis promises a menu.
-private val cycleSegments = cyclePresets.map { it.first } + "Custom"
+// One segmented control with a trailing custom segment, not five loose chips. The ellipsis
+// is the point: the segment opens a step rather than committing a value.
+private val cycleSegments = cyclePresets.map { it.first } + "\u2026"
 
 private val firstChargeOptions = listOf("Today", "1 Sep", "Pick…")
 private val chargeDateFormat = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
@@ -106,33 +105,68 @@ fun AddEditSubscriptionSheet(
     sheetState: SheetState,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    homeCurrency: String = "INR",
+    today: LocalDate = LocalDate.now(),
+    onSave: (Subscription) -> Unit = {},
     onSaved: () -> Unit = onDismiss,
+    onDelete: (() -> Unit)? = null,
     editing: Subscription? = null,
 ) {
     var name by remember { mutableStateOf(editing?.name.orEmpty()) }
-    var amount by remember { mutableStateOf("") }
-    var currency by remember { mutableStateOf(editing?.currency ?: SampleData.HOME_CURRENCY) }
-    var cycleIndex by remember { mutableIntStateOf(0) }
-    var chargeIndex by remember { mutableIntStateOf(0) }
+    // Prefilled when editing: the amount is what holds Save, so leaving it blank would disable
+    // "Save changes" until the figure had been retyped off the invoice.
+    var amount by remember {
+        mutableStateOf(editing?.let { majorText(it.amountMinor, it.currency) }.orEmpty())
+    }
+    var currency by remember { mutableStateOf(editing?.currency ?: homeCurrency) }
+    var cycleIndex by remember {
+        mutableIntStateOf(
+            cyclePresets.indexOfFirst { it.second == editing?.cycle }
+                .takeIf { it >= 0 } ?: if (editing == null) 0 else cycleSegments.lastIndex,
+        )
+    }
+    var chargeIndex by remember { mutableIntStateOf(if (editing == null) 0 else 2) }
     var isBusiness by remember { mutableStateOf(editing?.isBusiness ?: true) }
     var amountTouched by remember { mutableStateOf(false) }
-    var customCycle by remember { mutableStateOf<BillingCycle?>(null) }
+    var customCycle by remember { mutableStateOf(editing?.cycle?.takeUnless { it.isPreset }) }
     var step by remember { mutableStateOf(SheetStep.Form) }
     var pickingDate by remember { mutableStateOf(false) }
-    var firstCharge by remember { mutableStateOf(SampleData.today) }
+    var firstCharge by remember { mutableStateOf(editing?.anchorDate ?: today) }
 
     BackHandler(enabled = step != SheetStep.Form) { step = SheetStep.Form }
 
     val amountFocus = remember { FocusRequester() }
     val suggestions = remember(name) {
-        if (name.isBlank()) emptyList()
-        else catalogue.filter { it.name.startsWith(name, ignoreCase = true) }.take(3)
+        suggestServices(name)
     }
 
     val amountValue = amount.toDoubleOrNull() ?: 0.0
     // Only the amount holds Save. Validation appears on blur, never while typing.
     val amountError = amountTouched && amount.isNotEmpty() && amountValue <= 0.0
     val canSave = name.isNotBlank() && amountValue > 0.0
+
+    // Everything the form knows, as the domain object the repository stores. Fields this sheet
+    // does not offer yet are carried over from the row being edited rather than reset to null.
+    fun composed(): Subscription = Subscription(
+        id = editing?.id ?: UUID.randomUUID().toString(),
+        name = name.trim(),
+        amountMinor = minorUnits(amount, currency),
+        currency = currency,
+        cycle = customCycle ?: cyclePresets[cycleIndex.coerceIn(cyclePresets.indices)].second,
+        anchorDate = when (chargeIndex) {
+            0 -> today
+            1 -> firstOfSeptemberOnOrAfter(today)
+            else -> firstCharge
+        },
+        category = categoryFor(name) ?: editing?.category ?: Category.OTHER,
+        otherLabel = editing?.otherLabel,
+        isBusiness = isBusiness,
+        status = editing?.status ?: SubscriptionStatus.ACTIVE,
+        trialEndDate = editing?.trialEndDate,
+        resumeDate = editing?.resumeDate,
+        cancelledDate = editing?.cancelledDate,
+        notes = editing?.notes,
+    )
 
     // The amount and currency values are 20sp mono in the design — larger than a normal field.
     val fieldMoney = Toolbill.money.fieldValue.copy(fontSize = 20.sp, lineHeight = 26.sp)
@@ -197,8 +231,14 @@ fun AddEditSubscriptionSheet(
                 Text(
                     text = if (editing == null) "Cancel" else "Delete",
                     style = ToolbillText.button,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable(onClick = onDismiss),
+                    color = if (editing == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.clickable(
+                        onClick = { if (editing == null) onDismiss() else onDelete?.invoke() },
+                    ),
                 )
             }
 
@@ -226,16 +266,51 @@ fun AddEditSubscriptionSheet(
                             .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        val matchIdx = entry.name.indexOf(name, ignoreCase = true)
+                        val annotated = buildAnnotatedString {
+                            if (matchIdx >= 0) {
+                                append(entry.name.substring(0, matchIdx))
+                                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                                    append(entry.name.substring(matchIdx, matchIdx + name.length))
+                                }
+                                append(entry.name.substring(matchIdx + name.length))
+                            } else {
+                                append(entry.name)
+                            }
+                        }
                         Text(
-                            text = entry.name,
+                            text = annotated,
                             style = ToolbillText.rowName,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            text = "${entry.category} · ${entry.currency}",
+                            text = "${entry.category} \u00B7 ${entry.cycle.label()} \u00B7 ${entry.currency}",
                             style = ToolbillText.rowSupport,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                if (suggestions.isNotEmpty() && suggestions.none { it.name.equals(name, ignoreCase = true) }) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { amountFocus.requestFocus() }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Use \"${name}\" as typed",
+                            style = ToolbillText.rowSupport,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            painter = painterResource(ToolbillIcons.Return),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
@@ -305,6 +380,7 @@ fun AddEditSubscriptionSheet(
                                 label
                             },
                             selected = index == chargeIndex,
+                            showCheckmark = false,
                             onClick = {
                                 if (index == 2) pickingDate = true else chargeIndex = index
                             },
@@ -312,16 +388,51 @@ fun AddEditSubscriptionSheet(
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
-                ToolbillFilterChip(
-                    label = "Business expense",
-                    selected = isBusiness,
-                    onClick = { isBusiness = !isBusiness },
-                )
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { isBusiness = !isBusiness },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Business expense",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Switch(
+                        checked = isBusiness,
+                        onCheckedChange = { isBusiness = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { /* Category picker */ },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Category",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "Auto · from name ▾",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 // Category, notes and trial date stay behind text actions so the required path
                 // is only four fields long.
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(16.dp))
                 Row {
                     ToolbillTextButton(text = "+ Notes", onClick = {})
                     ToolbillTextButton(text = "+ Trial end date", onClick = {})
@@ -334,17 +445,25 @@ fun AddEditSubscriptionSheet(
                 ) {
                     ToolbillActionButton(
                         text = if (editing == null) "Save" else "Save changes",
-                        onClick = onSaved,
+                        onClick = { onSave(composed()); onSaved() },
                         enabled = canSave,
                         modifier = Modifier.weight(1f),
                     )
                     if (editing == null) {
-                        // Keeps the sheet open and resets only name and amount — the pattern
-                        // that gets someone from zero to thirty entries in one sitting.
+                        // Saves, then keeps the sheet open and resets only name and amount —
+                        // the pattern that gets someone from zero to thirty entries in one
+                        // sitting. Currency and cycle stay, because the next tool usually
+                        // shares them.
                         ToolbillOutlinedButton(
-                            text = "＋ Another",
-                            onClick = { name = ""; amount = ""; amountTouched = false },
+                            text = "Save & add another",
+                            onClick = {
+                                onSave(composed())
+                                name = ""
+                                amount = ""
+                                amountTouched = false
+                            },
                             enabled = canSave,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -369,4 +488,30 @@ fun AddEditSubscriptionSheet(
             onPick = { firstCharge = it; chargeIndex = 2; pickingDate = false },
         )
     }
+}
+
+
+/** The amount field's text, in the currency's own minor units. */
+private fun minorUnits(amount: String, currency: String): Long =
+    BigDecimal(amount.trim())
+        .movePointRight(MoneyFormat.fractionDigits(currency))
+        .setScale(0, RoundingMode.HALF_UP)
+        .toLong()
+
+/** The inverse, for prefilling the field when editing. */
+private fun majorText(amountMinor: Long, currency: String): String =
+    BigDecimal(amountMinor)
+        .movePointLeft(MoneyFormat.fractionDigits(currency))
+        .toPlainString()
+
+/**
+ * The category the sheet's "Auto, from name" row promises: taken from the bundled
+ * catalogue when the name matches one, and left to the caller's fallback when it does not.
+ */
+private fun categoryFor(name: String): Category? = catalogueCategoryFor(name)
+
+/** The "1 Sep" chip means the next one, which is this year until September has passed. */
+private fun firstOfSeptemberOnOrAfter(today: LocalDate): LocalDate {
+    val thisYear = LocalDate.of(today.year, 9, 1)
+    return if (thisYear < today) thisYear.plusYears(1) else thisYear
 }

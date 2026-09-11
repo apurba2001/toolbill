@@ -1,5 +1,6 @@
 package com.toolbill.android.feature.subscriptions
 
+import com.toolbill.android.core.domain.subscription.PricedSubscription
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.unit.dp
 import com.toolbill.android.core.design.component.RowActionSheet
 import com.toolbill.android.core.design.component.defaultRowActions
@@ -33,6 +38,7 @@ import com.toolbill.android.core.domain.date.nextChargeDate
 import com.toolbill.android.core.domain.money.MoneyFormat
 import com.toolbill.android.core.domain.money.normalizedMonthlyMinor
 import com.toolbill.android.core.domain.subscription.SubscriptionStatus
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -44,16 +50,22 @@ private val sortCaptions = listOf("high → low · /mo", "soonest first", "A →
 fun AllSubscriptionsScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    subscriptions: List<PricedSubscription> = SampleData.eightItemList,
+    subscriptions: List<PricedSubscription> = emptyList(),
+    homeCurrency: String = "INR",
+    today: LocalDate = LocalDate.now(),
     onOpenSubscription: (String) -> Unit = {},
     onAdd: () -> Unit = {},
     onImport: () -> Unit = {},
-    onAction: (String, String) -> Unit = { _, _ -> },
+    onMarkPaid: (PricedSubscription) -> Unit = {},
+    onSkipCharge: (PricedSubscription) -> Unit = {},
+    onTogglePause: (PricedSubscription) -> Unit = {},
+    onDuplicate: (PricedSubscription) -> Unit = {},
+    onEdit: (PricedSubscription) -> Unit = {},
+    onDelete: (PricedSubscription) -> Unit = {},
     query: String = "",
 ) {
     var sheetFor by remember { mutableStateOf<PricedSubscription?>(null) }
-    val home = SampleData.HOME_CURRENCY
-    val today = SampleData.today
+    val home = homeCurrency
 
     var filterIndex by remember { mutableIntStateOf(0) }
     var sortIndex by remember { mutableIntStateOf(0) }
@@ -62,8 +74,8 @@ fun AllSubscriptionsScreen(
     val personalCount = subscriptions.size - businessCount
     val filters = listOf(
         Filter("All"),
-        Filter("Business", businessCount.takeIf { it > 0 }),
-        Filter("Personal", personalCount.takeIf { it > 0 }),
+        Filter("Business"),
+        Filter("Personal"),
         Filter("Cancelled"),
         Filter("Paused"),
     )
@@ -142,17 +154,36 @@ fun AllSubscriptionsScreen(
             Spacer(Modifier.height(Space.s2))
             FilterChipRow(filters, filterIndex, onSelect = { filterIndex = it })
             Spacer(Modifier.height(Space.s3))
-            SortSelector(sortOptions, sortIndex, onSelect = { sortIndex = it })
-            Text(
-                text = sortCaptions[sortIndex],
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Space.s4, vertical = Space.s1),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Space.s4),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SortSelector(
+                    options = sortOptions,
+                    selectedIndex = sortIndex,
+                    horizontalPadding = 0.dp,
+                    // Shares its row with the sort caption, so the segments size to their
+                    // labels rather than pushing the caption off the right edge.
+                    fillWidth = false,
+                    onSelect = { sortIndex = it },
+                )
+                Text(
+                    text = sortCaptions[sortIndex],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.height(Space.s2))
             // The currency is declared once here and never repeated on 35 rows, which keeps
             // the digits in one tabular block.
-            AmountColumnHeader(leading = "SERVICE", trailing = "₹ / MONTH")
+            // The home currency's own symbol. This column header was a hardcoded rupee sign,
+            // so every figure beneath it was labelled in a currency the user may never have
+            // chosen -- on a GBP install it read "Rs / MONTH" over pounds.
+            AmountColumnHeader(
+                leading = "SERVICE",
+                trailing = "${MoneyFormat.format(0L, home).symbol} / MONTH",
+            )
             HorizontalDivider(color = Toolbill.stateColors.dividerDense)
         }
 
@@ -187,12 +218,13 @@ fun AllSubscriptionsScreen(
             subtitle = MoneyFormat.symbol(priced.homeAmountMinor, home) + " · " +
                 priced.subscription.cycle.label(),
             actions = defaultRowActions(
-                onMarkPaid = { onAction("Marked $name as paid", priced.subscription.id) },
-                onSkip = { onAction("Skipped this charge for $name", priced.subscription.id) },
-                onPause = { onAction("Paused $name", priced.subscription.id) },
-                onDuplicate = { onAction("Duplicated $name", priced.subscription.id) },
-                onEdit = { onOpenSubscription(priced.subscription.id) },
-                onDelete = { onAction("Deleted $name", priced.subscription.id) },
+                onMarkPaid = { onMarkPaid(priced) },
+                onSkip = { onSkipCharge(priced) },
+                onPause = { onTogglePause(priced) },
+                onDuplicate = { onDuplicate(priced) },
+                onEdit = { onEdit(priced) },
+                onDelete = { onDelete(priced) },
+                paused = priced.subscription.status == SubscriptionStatus.PAUSED,
             ),
             onDismiss = { sheetFor = null },
         )

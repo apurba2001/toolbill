@@ -23,11 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.unit.sp
+import com.toolbill.android.core.design.ToolbillIcons
 import com.toolbill.android.core.design.component.rememberHeaderScroll
 import com.toolbill.android.core.design.ToolbillText
 import com.toolbill.android.core.design.component.ScreenHeader
@@ -37,6 +36,8 @@ import com.toolbill.android.core.design.component.ToolbillTextButton
 import com.toolbill.android.core.design.EyebrowStyle
 import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Space
+import com.toolbill.android.core.billing.Entitlement
+import com.toolbill.android.core.billing.EntitlementReason
 import com.toolbill.android.core.design.Toolbill
 
 private data class ProFeature(val number: String, val title: String, val body: String)
@@ -76,10 +77,15 @@ private val plans = listOf(
 @Composable
 fun PaywallScreen(
     modifier: Modifier = Modifier,
+    entitlement: Entitlement = Entitlement.Free,
     onDismiss: () -> Unit = {},
     onRestore: () -> Unit = {},
 ) {
     var selected by remember { mutableStateOf<Int?>(null) }
+    // There is no Play Console and no RevenueCat account behind this build, so there is nothing
+    // to sell. The screen says so rather than offering a checkout that cannot take money.
+    val purchasable = entitlement.reason == EntitlementReason.PURCHASED ||
+        entitlement.reason == EntitlementReason.NONE
 
     val scrollState = rememberScrollState()
     val headerScroll = rememberHeaderScroll(offsetPx = { scrollState.value }, titleRevealPx = 56)
@@ -88,16 +94,18 @@ fun PaywallScreen(
         ScreenHeader(
             title = "Toolbill Pro",
             onBack = onDismiss,
-            backIcon = Icons.Rounded.Close,
+            backIcon = ToolbillIcons.Close,
             backDescription = "Close",
             scroll = headerScroll,
         ) {
-            Text(
-                text = "Restore purchase",
-                style = ToolbillText.restoreAction,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable(onClick = onRestore),
-            )
+            if (purchasable) {
+                Text(
+                    text = "Restore purchase",
+                    style = ToolbillText.restoreAction,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable(onClick = onRestore),
+                )
+            }
         }
         Column(
             modifier = Modifier
@@ -181,17 +189,33 @@ fun PaywallScreen(
         )
 
         Spacer(Modifier.height(Space.s6))
-        ToolbillButton(
-            text = if (selected == null) "Pick a plan to continue" else "Continue",
-            onClick = {},
-            enabled = selected != null,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (purchasable) {
+            ToolbillButton(
+                text = if (selected == null) "Pick a plan to continue" else "Continue",
+                onClick = {},
+                enabled = selected != null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            // Everything above is already in the user's hands, so the button that would sell it
+            // is replaced by the reason rather than disabled and left unexplained.
+            ToolbillButton(
+                text = "Close",
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(Space.s2))
+            Text(
+                text = "Every feature above is unlocked while Toolbill is in early access. " +
+                    "There is nothing to buy yet, and the prices shown are indicative — Play " +
+                    "will set them for your region when purchasing opens.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         Spacer(Modifier.height(Space.s2))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
-            ToolbillTextButton(text = "Terms", onClick = {})
-            ToolbillTextButton(text = "Privacy", onClick = {})
             Spacer(Modifier.weight(1f))
             ToolbillTextButton(text = "Not now", onClick = onDismiss)
         }

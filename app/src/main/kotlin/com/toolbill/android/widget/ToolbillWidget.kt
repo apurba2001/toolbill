@@ -1,5 +1,6 @@
 package com.toolbill.android.widget
 
+import com.toolbill.android.core.domain.subscription.PricedSubscription
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
@@ -27,8 +28,15 @@ import androidx.glance.layout.padding
 import androidx.glance.text.FontFamily
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.toolbill.android.ToolbillApplication
 import com.toolbill.android.core.domain.money.MoneyFormat
-import com.toolbill.android.feature.subscriptions.SampleData
+import com.toolbill.android.core.domain.subscription.UpcomingCharge
+import com.toolbill.android.core.domain.subscription.monthlyBurnMinor
+import com.toolbill.android.core.domain.subscription.pricedIn
+import com.toolbill.android.core.domain.subscription.upcomingCharges
+import kotlinx.coroutines.flow.first
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -52,9 +60,24 @@ class ToolbillWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(SmallSize, WideSize, TallSize))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // Read once, before composing. Glance composition is not the place for a query, and a
+        // widget that renders a spinner where a number should be is worse than a stale number.
+        val app = context.applicationContext as ToolbillApplication
+        val home = app.settings.homeCurrency.value
+        val today = LocalDate.now()
+        val subscriptions = app.subscriptionRepository.subscriptions.first()
+            .map { it.pricedIn(home) }
+
+        val state = WidgetState(
+            homeCurrency = home,
+            burnMinor = subscriptions.monthlyBurnMinor(),
+            upcoming = subscriptions.upcomingCharges(today, today.plusDays(6)),
+            updatedAt = LocalTime.now().format(updatedFormat),
+        )
+
         provideContent {
             GlanceTheme {
-                WidgetBody()
+                WidgetBody(state)
             }
         }
     }
@@ -97,11 +120,18 @@ private object WidgetType {
         )
 }
 
+/** Everything the widget draws, resolved before composition. */
+private data class WidgetState(
+    val homeCurrency: String,
+    val burnMinor: Long,
+    val upcoming: List<UpcomingCharge>,
+    val updatedAt: String,
+)
+
 @Composable
-private fun WidgetBody() {
+private fun WidgetBody(state: WidgetState) {
     val size = LocalSize.current
-    val home = SampleData.HOME_CURRENCY
-    val burn = MoneyFormat.format(SampleData.MONTHLY_BURN_MINOR, home).withoutFraction()
+    val burn = MoneyFormat.format(state.burnMinor, state.homeCurrency).withoutFraction()
 
     Column(
         modifier = GlanceModifier
@@ -111,8 +141,8 @@ private fun WidgetBody() {
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         when {
-            size.height >= TallSize.height -> TallLayout(burn.integer, burn.symbol, home)
-            size.width >= WideSize.width -> WideLayout(burn.integer, burn.symbol)
+            size.height >= TallSize.height -> TallLayout(burn.integer, burn.symbol, state)
+            size.width >= WideSize.width -> WideLayout(burn.integer, burn.symbol, state)
             else -> BurnBlock(label = "MONTHLY", figure = burn.integer, symbol = burn.symbol)
         }
     }
@@ -134,8 +164,8 @@ private fun BurnBlock(label: String, figure: String, symbol: String) {
 
 /** The 4×1: burn on the left, the single next renewal on the right. */
 @Composable
-private fun WideLayout(figure: String, symbol: String) {
-    val next = SampleData.nextSevenDays.first()
+private fun WideLayout(figure: String, symbol: String, state: WidgetState) {
+    val next = state.upcoming.firstOrNull()
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
@@ -146,21 +176,36 @@ private fun WideLayout(figure: String, symbol: String) {
         Column(horizontalAlignment = Alignment.Horizontal.End) {
             Text(text = "NEXT", style = WidgetType.label)
             Spacer(GlanceModifier.height(5.dp))
-            Text(text = next.first.subscription.name, style = WidgetType.renewalName)
-            Text(
-                text = "tomorrow · " +
-                    MoneyFormat.symbolWhole(next.first.homeAmountMinor, SampleData.HOME_CURRENCY),
-                style = WidgetType.renewalAccent,
-            )
+            if (next == null) {
+                Text(text = "Nothing this week", style = WidgetType.renewalName)
+            } else {
+                Text(text = next.priced.subscription.name, style = WidgetType.renewalName)
+                Text(
+                    text = relativeDay(next.date) + " · " +
+                        MoneyFormat.symbolWhole(next.amountMinor, state.homeCurrency),
+                    style = WidgetType.renewalAccent,
+                )
+            }
         }
+    }
+}
+
+/** The widget has room for a word, not a date. Beyond tomorrow it states the day count. */
+private fun relativeDay(date: LocalDate): String {
+    val days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)
+    return when {
+        days <= 0L -> "today"
+        days == 1L -> "tomorrow"
+        else -> "in $days days"
     }
 }
 
 /** The 4×2: burn, three renewals, and the week's total. */
 @Composable
-private fun TallLayout(figure: String, symbol: String, home: String) {
-    val upcoming = SampleData.nextSevenDays.take(3)
-    val weekTotal = SampleData.nextSevenDays.sumOf { it.first.homeAmountMinor }
+private fun TallLayout(figure: String, symbol: String, state: WidgetState) {
+    val home = state.homeCurrency
+    val upcoming = state.upcoming.take(3)
+    val weekTotal = state.upcoming.sumOf { it.amountMinor }
 
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         Text(
@@ -168,10 +213,7 @@ private fun TallLayout(figure: String, symbol: String, home: String) {
             style = WidgetType.label,
             modifier = GlanceModifier.defaultWeight(),
         )
-        Text(
-            text = "UPD " + SampleData.today.atStartOfDay().format(updatedFormat),
-            style = WidgetType.label,
-        )
+        Text(text = "UPD " + state.updatedAt, style = WidgetType.label)
     }
     Spacer(GlanceModifier.height(6.dp))
     Row(verticalAlignment = Alignment.Vertical.Bottom) {
@@ -180,15 +222,18 @@ private fun TallLayout(figure: String, symbol: String, home: String) {
         Text(text = figure, style = WidgetType.figure)
     }
     Spacer(GlanceModifier.height(8.dp))
-    upcoming.forEach { (priced, _) ->
+    if (upcoming.isEmpty()) {
+        Text(text = "No charges in the next 7 days", style = WidgetType.renewalName)
+    }
+    upcoming.forEach { charge ->
         Row(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 1.dp)) {
             Text(
-                text = priced.subscription.name,
+                text = charge.priced.subscription.name,
                 style = WidgetType.renewalName,
                 modifier = GlanceModifier.defaultWeight(),
             )
             Text(
-                text = MoneyFormat.format(priced.homeAmountMinor, home).withoutFraction().plain,
+                text = MoneyFormat.format(charge.amountMinor, home).withoutFraction().plain,
                 style = WidgetType.renewalAccent,
             )
         }

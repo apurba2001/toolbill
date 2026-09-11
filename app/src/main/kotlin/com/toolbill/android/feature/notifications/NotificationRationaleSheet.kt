@@ -28,6 +28,9 @@ import com.toolbill.android.core.design.IbmPlexSans
 import com.toolbill.android.core.design.Radius
 import com.toolbill.android.core.design.Toolbill
 import com.toolbill.android.core.design.ToolbillText
+import com.toolbill.android.core.domain.money.FxRates
+import com.toolbill.android.core.domain.money.MoneyFormat
+import com.toolbill.android.core.domain.reminder.DEFAULT_LEAD_DAYS
 import com.toolbill.android.core.design.component.ToolbillActionButton
 import com.toolbill.android.core.design.component.ToolbillActionTextButton
 
@@ -65,7 +68,19 @@ private val Promise = TextStyle(
 fun NotificationRationaleSheet(
     onAllow: () -> Unit = {},
     onDismiss: () -> Unit = {},
+    // The sample below is a promise about what will arrive, so it is drawn in the user's own
+    // currency and lead time. It used to read "in 3 days - Rs 1,742" whatever they had chosen,
+    // which is a preview of a notification this install would never send.
+    leadDays: Int = DEFAULT_LEAD_DAYS,
+    homeCurrency: String = "INR",
 ) {
+    // A real SaaS price, converted rather than restated: 20 USD is Rs 1,742, which is the
+    // figure the design draws. A flat 174_200 minor units would have read as $1,742.
+    val sampleAmount = MoneyFormat.symbolWhole(
+        FxRates.convertMinor(2_000L, "USD", homeCurrency) ?: 2_000L,
+        homeCurrency,
+    )
+    val leadPhrase = if (leadDays == 1) "a day" else "$leadDays days"
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -81,7 +96,7 @@ fun NotificationRationaleSheet(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Want a nudge three days before a charge?",
+                text = "Want a nudge $leadPhrase before a charge?",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -94,7 +109,7 @@ fun NotificationRationaleSheet(
             )
 
             Spacer(Modifier.height(18.dp))
-            NotificationPreview()
+            NotificationPreview(leadPhrase = leadPhrase, amount = sampleAmount)
 
             // The three promises sit under a rule — they are the terms of the ask.
             Spacer(Modifier.height(16.dp))
@@ -146,7 +161,7 @@ fun NotificationRationaleSheet(
  * reason the sheet does not need to describe what a reminder looks like.
  */
 @Composable
-private fun NotificationPreview() {
+private fun NotificationPreview(leadPhrase: String, amount: String) {
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
@@ -178,7 +193,7 @@ private fun NotificationPreview() {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Vercel Pro renews in 3 days — ₹1,742",
+            text = "Vercel Pro renews in $leadPhrase — $amount",
             style = TextStyle(
                 fontFamily = IbmPlexSans,
                 fontWeight = FontWeight.Normal,

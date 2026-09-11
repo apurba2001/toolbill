@@ -2,6 +2,7 @@ package com.toolbill.android.feature.subscriptions
 
 import com.toolbill.android.core.design.component.RowState
 import com.toolbill.android.core.domain.money.normalizedMonthlyMinor
+import com.toolbill.android.core.domain.subscription.PricedSubscription
 import com.toolbill.android.core.domain.subscription.SubscriptionStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Toolbill mark: one rule, three bars.
+
+  The rule is the normalized monthly figure, in the app's own amber - the colour every hero
+  number on every screen is drawn in. The bars beneath it are the subscriptions that make it up,
+  at different lengths because they cost different amounts on different cycles. That is the
+  product thesis: many billing cycles reduced to one comparable figure.
+
+  No dollar sign, no mascot, no coin. The user of this app runs Linear and Raycast, and the
+  positioning is explicit that this is a tool rather than a consumer finance product.
+
+  GEOMETRY: everything sits inside a circle of radius 33 about the centre (54,54). The adaptive
+  safe zone is usually quoted as the central 72x72 box, but a circular mask is the tighter
+  constraint - the first cut of this icon fitted the box and had the rule's rounded ends sliced
+  flat by the circle on a Pixel launcher. Worst corner here is the rule's, at 30.8 from centre.
+
+  The bars stop clear of the rule rather than crossing it, so the mark stays legible once it is
+  flattened to a single colour for the themed-icon layer.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- The normalized total. Overhangs the bars it sums, so it reads as a ledger rule. -->
+    <path
+        android:fillColor="#F2C35C"
+        android:pathData="M31.5,36 h45 a2.5,2.5 0 0 1 0,5 h-45 a2.5,2.5 0 0 1 0,-5 z" />
+
+    <!-- The tools underneath it. -->
+    <path
+        android:fillColor="#EAE6E0"
+        android:pathData="M34,47 h6 a2,2 0 0 1 2,2 v19 a2,2 0 0 1 -2,2 h-6 a2,2 0 0 1 -2,-2 v-19 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#EAE6E0"
+        android:pathData="M51,47 h6 a2,2 0 0 1 2,2 v10 a2,2 0 0 1 -2,2 h-6 a2,2 0 0 1 -2,-2 v-10 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#EAE6E0"
+        android:pathData="M68,47 h6 a2,2 0 0 1 2,2 v24 a2,2 0 0 1 -2,2 h-6 a2,2 0 0 1 -2,-2 v-24 a2,2 0 0 1 2,-2 z" />
+</vector>

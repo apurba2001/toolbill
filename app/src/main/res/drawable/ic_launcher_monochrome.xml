@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The themed-icon layer (Android 13+), where the system tints the whole mark one colour and the
+  amber cannot survive. Same geometry as the foreground, flattened: the gap between the rule and
+  the bars is what keeps the mark legible once every element is the same tone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M31.5,36 h45 a2.5,2.5 0 0 1 0,5 h-45 a2.5,2.5 0 0 1 0,-5 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,47 h6 a2,2 0 0 1 2,2 v19 a2,2 0 0 1 -2,2 h-6 a2,2 0 0 1 -2,-2 v-19 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,47 h6 a2,2 0 0 1 2,2 v10 a2,2 0 0 1 -2,2 h-6 a2,2 0 0 1 -2,-2 v-10 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M68,47 h6 a2,2 0 0 1 2,2 v24 a2,2 0 0 1 -2,2 h-6 a2,2 0 0 1 -2,-2 v-24 a2,2 0 0 1 2,-2 z" />
+</vector>
