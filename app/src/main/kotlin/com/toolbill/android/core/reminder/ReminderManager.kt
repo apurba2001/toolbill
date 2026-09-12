@@ -85,7 +85,7 @@ class ReminderManager(
         owed.forEach { ReminderNotifier.notify(context, it, home, today) }
 
         settings.deliveredReminderKeys = pruneDelivered(delivered + owed.map { it.key }, today)
-        settings.lastReminderFiredAt = System.currentTimeMillis()
+        settings.recordReminderFired(wasTest = false)
     }
 
     /** Arms the single alarm, or cancels it when the portfolio owes nothing. */

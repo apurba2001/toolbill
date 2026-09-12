@@ -1,6 +1,8 @@
 package com.toolbill.android.core.data.fx
 
 import com.toolbill.android.core.domain.money.FxRateTable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -43,7 +45,18 @@ class FrankfurterApi(
      * depends on a network, and every caller has a perfectly good answer for not getting one —
      * keep using the rates already in hand.
      */
-    fun fetchLatest(symbols: Collection<String>): Result<FxRateTable> = runCatching {
+    suspend fun fetchLatest(symbols: Collection<String>): Result<FxRateTable> =
+        withContext(Dispatchers.IO) { fetchBlocking(symbols) }
+
+    /**
+     * The call itself, which blocks.
+     *
+     * Main-safe at the boundary above rather than at each call site: a worker and an app-start
+     * coroutine were already on IO and worked, so the one caller that was not -- a tap in
+     * Settings -- was the only place this threw, and it threw NetworkOnMainThreadException where
+     * a user would read it as "could not reach the rate source".
+     */
+    private fun fetchBlocking(symbols: Collection<String>): Result<FxRateTable> = runCatching {
         val wanted = symbols.map { it.uppercase() }.filterNot { it == BASE }.sorted()
         require(wanted.isNotEmpty()) { "nothing to fetch" }
 

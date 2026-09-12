@@ -201,6 +201,12 @@ fun SortSelector(
                     text = option,
                     style = textStyle,
                     color = if (selected) scheme.onPrimary else scheme.onSurface,
+                    // Only where segments size to their own content, which is the scrolling
+                    // case: there the label can always be shown in full, so wrapping would be a
+                    // bug. Equal-width segments must keep wrapping -- forcing one line there
+                    // clips "Business only" to "Business onl", which is worse than two lines.
+                    maxLines = if (fillWidth) Int.MAX_VALUE else 1,
+                    softWrap = fillWidth,
                 )
             }
         }

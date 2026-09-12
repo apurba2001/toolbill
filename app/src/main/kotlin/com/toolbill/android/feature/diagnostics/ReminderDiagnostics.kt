@@ -19,6 +19,10 @@ import java.util.Locale
 /** One line of the self-check. [ok] false renders in the overdue colour, never as a scare. */
 data class SelfCheck(val label: String, val detail: String, val ok: Boolean)
 
+/** Named, because the screen decides what guidance to show by reading these two back. */
+const val NOTIFICATION_CHECK = "Notification permission"
+const val BATTERY_CHECK = "Battery optimization"
+
 private val firedFormat = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.ENGLISH)
 
 /**
@@ -53,16 +57,24 @@ fun selfChecks(
 
     return listOf(
         SelfCheck(
-            label = "Notification permission",
+            label = NOTIFICATION_CHECK,
             detail = if (notificationsOn) "granted" else "not granted",
             ok = notificationsOn,
         ),
         SelfCheck(
-            label = "Battery optimization",
+            label = BATTERY_CHECK,
             detail = if (unrestricted) "unrestricted" else "restricted",
             ok = unrestricted,
         ),
-        lastSeen("Last reminder fired", settings.lastReminderFiredAt, now),
+        lastSeen(
+            label = "Last reminder fired",
+            epochMillis = settings.lastReminderFiredAt,
+            now = now,
+            // A test proves the delivery path and nothing else. Reporting it as a reminder
+            // having fired would let this screen look healthy on a phone that is dropping every
+            // real renewal -- which is the exact failure it exists to catch.
+            suffix = if (settings.lastReminderWasTest) " (test)" else "",
+        ),
         lastSeen("Widget last updated", settings.lastWidgetUpdateAt, now),
     )
 }
@@ -73,7 +85,12 @@ fun selfChecks(
  * Anything older than two days counts as not ok: a daily-scheduled app that has not woken in
  * two days is being held down, whatever the permission rows say.
  */
-private fun lastSeen(label: String, epochMillis: Long, now: Instant): SelfCheck {
+private fun lastSeen(
+    label: String,
+    epochMillis: Long,
+    now: Instant,
+    suffix: String = "",
+): SelfCheck {
     if (epochMillis <= 0L) return SelfCheck(label, "never", ok = false)
 
     val at = Instant.ofEpochMilli(epochMillis)
@@ -85,7 +102,7 @@ private fun lastSeen(label: String, epochMillis: Long, now: Instant): SelfCheck 
         age.toDays() < 7 -> "${age.toDays()} days ago"
         else -> LocalDateTime.ofInstant(at, ZoneId.systemDefault()).format(firedFormat)
     }
-    return SelfCheck(label, detail, ok = age.toDays() < 2)
+    return SelfCheck(label, detail + suffix, ok = age.toDays() < 2)
 }
 
 /**
@@ -95,13 +112,14 @@ private fun lastSeen(label: String, epochMillis: Long, now: Instant): SelfCheck 
  * that resolves to nothing leaves the user on a screen that did not open with no idea why.
  */
 fun openBatterySettings(context: Context) {
+    // No FLAG_ACTIVITY_NEW_TASK. Started from the activity, these belong in its own task, so
+    // back comes straight home to Toolbill -- a new task puts system settings in a separate
+    // entry in the recents list and makes the way back the user's problem to find.
     val perApp = Intent(
         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
         Uri.fromParts("package", context.packageName, null),
-    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
+    )
     val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     runCatching { context.startActivity(perApp) }
         .recoverCatching { context.startActivity(fallback) }
@@ -109,8 +127,8 @@ fun openBatterySettings(context: Context) {
 
 /** The system notification screen for this app, where the permission row is turned back on. */
 fun openNotificationSettings(context: Context) {
+    // Same task as the app; see openBatterySettings.
     val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(intent) }
 }

@@ -42,7 +42,10 @@ class FxRepository(
      */
     suspend fun refresh(today: LocalDate = LocalDate.now()): Boolean {
         val fetched = api.fetchLatest(FxRates.BUNDLED.supported).getOrElse { failure ->
-            Log.i(TAG, "Rate refresh skipped: ${failure.message}")
+            // The class as well as the message. A timeout and a parse error are different
+            // problems with different fixes, and several of the exceptions that land here carry
+            // no message at all -- "skipped: null" told nobody anything.
+            Log.i(TAG, "Rate refresh skipped: ${failure::class.java.simpleName}: ${failure.message}")
             return false
         }
 

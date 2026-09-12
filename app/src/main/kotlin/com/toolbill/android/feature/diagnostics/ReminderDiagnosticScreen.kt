@@ -78,6 +78,17 @@ fun ReminderDiagnosticScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val notificationsAllowed = checks.firstOrNull { it.label == NOTIFICATION_CHECK }?.ok == true
+    val batteryUnrestricted = checks.firstOrNull { it.label == BATTERY_CHECK }?.ok == true
+    val fixes = buildList {
+        if (!batteryUnrestricted) add("Set battery saver for Toolbill to No restrictions.")
+        if (!notificationsAllowed) add("Allow Toolbill to send notifications.")
+        // Autostart has no API to read, so it is only ever advice -- and only worth giving
+        // alongside a real problem, never on its own.
+        if (!batteryUnrestricted) add("Turn on Autostart so reminders survive a reboot.")
+    }
+    val needsAttention = fixes.isNotEmpty()
+
     val scrollState = rememberScrollState()
     val headerScroll = rememberHeaderScroll(offsetPx = { scrollState.value }, titleRevealPx = 72)
 
@@ -93,7 +104,11 @@ fun ReminderDiagnosticScreen(
         // The header spans the full width; everything below it keeps the 16dp gutter.
         Column(Modifier.padding(horizontal = Space.s4)) {
             Text(
-                    text = "Your phone is probably putting Toolbill to sleep.",
+                    text = if (needsAttention) {
+                        "Your phone is probably putting Toolbill to sleep."
+                    } else {
+                        "Reminders should arrive on this phone."
+                    },
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -132,38 +147,58 @@ fun ReminderDiagnosticScreen(
                         )
                     }
 
-                    Spacer(Modifier.height(Space.s6))
-                    Text(
-                        text = "Two settings to change",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(Space.s2))
-                    NumberedStep("1", "Set battery saver for Toolbill to No restrictions.")
-                    NumberedStep("2", "Turn on Autostart so reminders survive a reboot.")
-
-                    Spacer(Modifier.height(Space.s4))
-                    // Stacked: "Open battery settings" and "Notifications" do not fit on one
-                    // line at 400dp, and the outlined one broke mid-word.
-                    Column(verticalArrangement = Arrangement.spacedBy(Space.s2)) {
-                        ToolbillButton(
-                            text = "Open battery settings",
-                            onClick = { openBatterySettings(context) },
-                            modifier = Modifier.fillMaxWidth(),
+                    // Only shown when there is something to change. With both permissions
+                    // already in order, a numbered list of fixes and two buttons into system
+                    // settings is an instruction to solve a problem the user does not have --
+                    // and it makes a healthy screen read like a broken one.
+                    if (needsAttention) {
+                        Spacer(Modifier.height(Space.s6))
+                        Text(
+                            text = if (fixes.size == 1) "One setting to change" else "Two settings to change",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
-                        ToolbillOutlinedButton(
-                            text = "Notification settings",
-                            onClick = { openNotificationSettings(context) },
-                            modifier = Modifier.fillMaxWidth(),
+                        Spacer(Modifier.height(Space.s2))
+                        fixes.forEachIndexed { index, fix ->
+                            NumberedStep("${index + 1}", fix)
+                        }
+
+                        Spacer(Modifier.height(Space.s4))
+                        // Stacked: the two labels do not fit on one line at 400dp, and the
+                        // outlined one broke mid-word.
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.s2)) {
+                            if (!batteryUnrestricted) {
+                                ToolbillButton(
+                                    text = "Open battery settings",
+                                    onClick = { openBatterySettings(context) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            if (!notificationsAllowed) {
+                                ToolbillOutlinedButton(
+                                    text = "Notification settings",
+                                    onClick = { openNotificationSettings(context) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(Space.s4))
+                        Text(
+                            text = "Opens this app's own page in system settings. Manufacturer " +
+                                "menus differ, so the autostart toggle may sit a level deeper.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Spacer(Modifier.height(Space.s4))
+                        Text(
+                            text = "Nothing to change. This phone is letting Toolbill wake up " +
+                                "when it needs to — send yourself a test below if you want " +
+                                "to see it arrive.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Spacer(Modifier.height(Space.s4))
-                    Text(
-                        text = "Opens this app's own page in system settings. Manufacturer " +
-                            "menus differ, so the autostart toggle may sit a level deeper.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
 
@@ -217,7 +252,11 @@ fun ReminderDiagnosticScreen(
                 ToolbillOutlinedButton(
                     text = "Send test",
                     onClick = {
-                        ReminderNotifier.notifyTest(context)
+                        // Recorded only if it actually reached the notification manager, and
+                        // marked as a test so the row cannot pass for a real renewal firing.
+                        if (ReminderNotifier.notifyTest(context)) {
+                            userSettings.recordReminderFired(wasTest = true)
+                        }
                         checks = selfChecks(context, userSettings)
                     },
                     // Nothing to prove while notifications are off, and the row above already

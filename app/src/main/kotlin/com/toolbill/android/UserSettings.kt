@@ -54,6 +54,19 @@ class UserSettings(context: Context) {
         get() = prefs.getLong("last_widget_update_at", 0L)
         set(value) { prefs.edit { putLong("last_widget_update_at", value) } }
 
+    /** Whether [lastReminderFiredAt] came from the diagnostic screen's test rather than a renewal. */
+    var lastReminderWasTest: Boolean
+        get() = prefs.getBoolean("last_reminder_was_test", false)
+        set(value) { prefs.edit { putBoolean("last_reminder_was_test", value) } }
+
+    /** Records a delivery that actually reached the notification manager. */
+    fun recordReminderFired(wasTest: Boolean) {
+        prefs.edit {
+            putLong("last_reminder_fired_at", System.currentTimeMillis())
+            putBoolean("last_reminder_was_test", wasTest)
+        }
+    }
+
     /**
      * How many days before a renewal the reminder lands.
      *

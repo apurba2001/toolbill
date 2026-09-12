@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,7 +73,7 @@ import java.util.Locale
 import java.util.UUID
 
 /** Which step the sheet is showing. The sheet itself never stacks. */
-private enum class SheetStep { Form, Cycle, Currency }
+private enum class SheetStep { Form, Cycle, Currency, Category }
 
 private val cyclePresets = listOf(
     "Monthly" to BillingCycle.MONTHLY,
@@ -85,7 +86,15 @@ private val cyclePresets = listOf(
 // is the point: the segment opens a step rather than committing a value.
 private val cycleSegments = cyclePresets.map { it.first } + "\u2026"
 
-private val firstChargeOptions = listOf("Today", "1 Sep", "Pick…")
+/**
+ * The first-charge presets.
+ *
+ * The middle one used to be a literal "1 Sep", which is only a sensible default in August: after
+ * the 1st of September it resolved to the *next* year, so a subscription added in October was
+ * anchored eleven months out and showed up on no calendar the user would ever look at. The 1st
+ * of next month is the common billing anchor and is always within a month.
+ */
+private val firstChargeOptions = listOf("Today", "", "Pick…")
 private val chargeDateFormat = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 
 /**
@@ -125,13 +134,15 @@ fun AddEditSubscriptionSheet(
                 .takeIf { it >= 0 } ?: if (editing == null) 0 else cycleSegments.lastIndex,
         )
     }
-    var chargeIndex by remember { mutableIntStateOf(if (editing == null) 0 else 2) }
     var isBusiness by remember { mutableStateOf(editing?.isBusiness ?: true) }
     var amountTouched by remember { mutableStateOf(false) }
     var customCycle by remember { mutableStateOf(editing?.cycle?.takeUnless { it.isPreset }) }
     var step by remember { mutableStateOf(SheetStep.Form) }
     var pickingDate by remember { mutableStateOf(false) }
     var firstCharge by remember { mutableStateOf(editing?.anchorDate ?: today) }
+    // null means "follow the name", which is what the row has always claimed to do. An edited
+    // subscription starts pinned to whatever it was saved with.
+    var chosenCategory by remember { mutableStateOf(editing?.category) }
 
     BackHandler(enabled = step != SheetStep.Form) { step = SheetStep.Form }
 
@@ -153,12 +164,8 @@ fun AddEditSubscriptionSheet(
         amountMinor = minorUnits(amount, currency),
         currency = currency,
         cycle = customCycle ?: cyclePresets[cycleIndex.coerceIn(cyclePresets.indices)].second,
-        anchorDate = when (chargeIndex) {
-            0 -> today
-            1 -> firstOfSeptemberOnOrAfter(today)
-            else -> firstCharge
-        },
-        category = categoryFor(name) ?: editing?.category ?: Category.OTHER,
+        anchorDate = firstCharge,
+        category = chosenCategory ?: categoryFor(name) ?: Category.OTHER,
         otherLabel = editing?.otherLabel,
         isBusiness = isBusiness,
         status = editing?.status ?: SubscriptionStatus.ACTIVE,
@@ -208,6 +215,13 @@ fun AddEditSubscriptionSheet(
                     selected = currency,
                     onBack = { step = SheetStep.Form },
                     onPick = { currency = it; step = SheetStep.Form },
+                )
+
+                SheetStep.Category -> CategoryPickerContent(
+                    selected = chosenCategory,
+                    autoCategory = categoryFor(name),
+                    onBack = { step = SheetStep.Form },
+                    onPick = { chosenCategory = it; step = SheetStep.Form },
                 )
 
                 SheetStep.Form ->
@@ -352,6 +366,10 @@ fun AddEditSubscriptionSheet(
                     options = cycleSegments,
                     selectedIndex = cycleIndex,
                     horizontalPadding = 0.dp,
+                    // Segments size to their own labels and the row scrolls if the five of them
+                    // do not fit, rather than each being squeezed to a fifth of the width.
+                    fillWidth = false,
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
                     // The last segment is the custom cycle; it opens a nested sheet rather than
                     // growing this one, so the required fields stay above the keyboard.
                     onSelect = { index ->
@@ -371,18 +389,31 @@ fun AddEditSubscriptionSheet(
                 Spacer(Modifier.height(14.dp))
                 FieldSectionLabel("First charge")
                 Spacer(Modifier.height(8.dp))
+                // Which chip is lit is derived from the date rather than tracked beside it.
+                // Held separately, editing a 1-September subscription selected the custom chip
+                // and rendered it as "1 Sep" next to a preset reading the same thing -- two
+                // chips, same label, one of them lit, for a single date.
+                val nextMonth = firstOfNextMonth(today)
+                val presetDates = listOf(today, nextMonth)
+                val selectedChip = presetDates.indexOf(firstCharge).takeIf { it >= 0 } ?: 2
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     firstChargeOptions.forEachIndexed { index, label ->
                         ToolbillFilterChip(
-                            label = if (index == 2 && chargeIndex == 2) {
-                                firstCharge.format(chargeDateFormat)
-                            } else {
-                                label
+                            label = when {
+                                index == 1 -> nextMonth.format(chargeDateFormat)
+                                index == 2 && selectedChip == 2 ->
+                                    firstCharge.format(chargeDateFormat)
+
+                                else -> label
                             },
-                            selected = index == chargeIndex,
+                            selected = index == selectedChip,
                             showCheckmark = false,
                             onClick = {
-                                if (index == 2) pickingDate = true else chargeIndex = index
+                                when (index) {
+                                    2 -> pickingDate = true
+                                    else -> firstCharge = presetDates[index]
+                                }
                             },
                         )
                     }
@@ -414,7 +445,9 @@ fun AddEditSubscriptionSheet(
 
                 Spacer(Modifier.height(16.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth().clickable { /* Category picker */ },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { step = SheetStep.Category },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -424,7 +457,11 @@ fun AddEditSubscriptionSheet(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Auto · from name ▾",
+                        // Names the category that will actually be saved. "Auto · from name"
+                        // was true of the mechanism and told the user nothing about the result.
+                        text = (chosenCategory ?: categoryFor(name))?.displayName?.let {
+                            if (chosenCategory == null) "Auto · $it ▾" else "$it ▾"
+                        } ?: "Auto · from name ▾",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -485,7 +522,7 @@ fun AddEditSubscriptionSheet(
         FirstChargeDatePicker(
             initial = firstCharge,
             onDismiss = { pickingDate = false },
-            onPick = { firstCharge = it; chargeIndex = 2; pickingDate = false },
+            onPick = { firstCharge = it; pickingDate = false },
         )
     }
 }
@@ -511,7 +548,6 @@ private fun majorText(amountMinor: Long, currency: String): String =
 private fun categoryFor(name: String): Category? = catalogueCategoryFor(name)
 
 /** The "1 Sep" chip means the next one, which is this year until September has passed. */
-private fun firstOfSeptemberOnOrAfter(today: LocalDate): LocalDate {
-    val thisYear = LocalDate.of(today.year, 9, 1)
-    return if (thisYear < today) thisYear.plusYears(1) else thisYear
-}
+/** The 1st of next month — the most common billing anchor, and never more than 31 days out. */
+private fun firstOfNextMonth(today: LocalDate): LocalDate =
+    today.withDayOfMonth(1).plusMonths(1)

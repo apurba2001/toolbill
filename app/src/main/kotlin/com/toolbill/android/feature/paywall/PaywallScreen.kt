@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,10 +81,12 @@ private val plans = listOf(
 fun PaywallScreen(
     modifier: Modifier = Modifier,
     entitlement: Entitlement = Entitlement.Free,
+    trackedCount: Int = 0,
     onDismiss: () -> Unit = {},
     onRestore: () -> Unit = {},
 ) {
     var selected by remember { mutableStateOf<Int?>(null) }
+    var explaining by remember { mutableStateOf(false) }
     // There is no Play Console and no RevenueCat account behind this build, so there is nothing
     // to sell. The screen says so rather than offering a checkout that cannot take money.
     val purchasable = entitlement.reason == EntitlementReason.PURCHASED ||
@@ -98,14 +103,14 @@ fun PaywallScreen(
             backDescription = "Close",
             scroll = headerScroll,
         ) {
-            if (purchasable) {
-                Text(
-                    text = "Restore purchase",
-                    style = ToolbillText.restoreAction,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable(onClick = onRestore),
-                )
-            }
+            Text(
+                text = "Restore purchase",
+                style = ToolbillText.restoreAction,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable {
+                    if (purchasable) onRestore() else explaining = true
+                },
+            )
         }
         Column(
             modifier = Modifier
@@ -122,9 +127,18 @@ fun PaywallScreen(
         )
         Spacer(Modifier.height(Space.s2))
         Text(
-            text = "Tracking stays free and unlimited — all 31 of your subscriptions, forever, " +
-                "with no entry cap. Pro pays for the four things that need building and " +
-                "maintaining.",
+            // The real count. It read "all 31 of your subscriptions" to everybody, including
+            // someone who had just installed the app and had none -- and the sentence exists to
+            // promise no cap, which lands harder when the number is theirs.
+            text = if (trackedCount > 0) {
+                "Tracking stays free and unlimited — all $trackedCount of your " +
+                    "subscriptions, forever, with no entry cap. Pro pays for the four things " +
+                    "that need building and maintaining."
+            } else {
+                "Tracking stays free and unlimited — every subscription you add, forever, " +
+                    "with no entry cap. Pro pays for the four things that need building and " +
+                    "maintaining."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -160,13 +174,21 @@ fun PaywallScreen(
         }
 
         Spacer(Modifier.height(Space.s6))
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+        // Equal width from the weights, equal height from the intrinsic pass: the two captions
+        // are different lengths, and without this the taller one sets its own card's height and
+        // the pair reads as a comparison where one option is somehow bigger than the other.
+        Row(
+            modifier = Modifier.height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(Space.s2),
+        ) {
             plans.forEachIndexed { index, plan ->
                 PlanCard(
                     plan = plan,
                     selected = selected == index,
                     onSelect = { selected = index },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
                 )
             }
         }
@@ -189,39 +211,46 @@ fun PaywallScreen(
         )
 
         Spacer(Modifier.height(Space.s6))
-        if (purchasable) {
-            ToolbillButton(
-                text = if (selected == null) "Pick a plan to continue" else "Continue",
-                onClick = {},
-                enabled = selected != null,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            // Everything above is already in the user's hands, so the button that would sell it
-            // is replaced by the reason rather than disabled and left unexplained.
-            ToolbillButton(
-                text = "Close",
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(Space.s2))
-            Text(
-                text = "Every feature above is unlocked while Toolbill is in early access. " +
-                    "There is nothing to buy yet, and the prices shown are indicative — Play " +
-                    "will set them for your region when purchasing opens.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ToolbillButton(
+            text = if (selected == null) "Pick a plan to continue" else "Continue",
+            // Enabled exactly as the design intends. What it cannot do yet, it says -- rather
+            // than being hidden, which reads as the screen being broken or the build being
+            // wrong, and leaves the user guessing why a plan they picked led nowhere.
+            onClick = { explaining = true },
+            enabled = selected != null,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         Spacer(Modifier.height(Space.s2))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s2)) {
+            ToolbillTextButton(text = "Terms", onClick = { explaining = true })
+            ToolbillTextButton(text = "Privacy", onClick = { explaining = true })
             Spacer(Modifier.weight(1f))
             ToolbillTextButton(text = "Not now", onClick = onDismiss)
         }
         Spacer(Modifier.height(Space.s8))
         }
         }
+    }
+
+    if (explaining) {
+        AlertDialog(
+            onDismissRequest = { explaining = false },
+            title = { Text("Not open yet") },
+            text = {
+                Text(
+                    text = "Toolbill is in early access, so there is nothing to buy — and " +
+                        "nothing is locked: every feature listed here already works. Buying " +
+                        "opens when the app is on Google Play, which is also where the price " +
+                        "for your region gets set. Nothing has been charged.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            },
+            confirmButton = {
+                ToolbillTextButton(text = "Got it", onClick = { explaining = false })
+            },
+        )
     }
 }
 
@@ -245,7 +274,11 @@ private fun PlanCard(
             },
         ),
     ) {
-        Column(Modifier.padding(Space.s4)) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(Space.s4),
+        ) {
             Text(
                 text = plan.name,
                 style = EyebrowStyle,

@@ -1,5 +1,7 @@
 package com.toolbill.android.feature.subscriptions
 
+import com.toolbill.android.core.design.Space
+import com.toolbill.android.core.domain.subscription.Category
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -150,6 +152,14 @@ private fun StepHeader(title: String, onBack: () -> Unit) {
 /** The currency step. A plain list — the same shape onboarding uses for the same job. */
 @Composable
 fun CurrencyPickerContent(
+    /**
+     * What this picker is choosing.
+     *
+     * The same list serves two questions -- what a subscription is billed in, and what
+     * everything converts to -- and "Billed in" is only right for one of them. Settings was
+     * asking which currency you think in under a heading about billing.
+     */
+    title: String = "Billed in",
     selected: String,
     onBack: () -> Unit,
     onPick: (String) -> Unit,
@@ -167,7 +177,7 @@ fun CurrencyPickerContent(
 
     Column(Modifier.padding(bottom = 16.dp)) {
             Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                StepHeader(title = "Billed in", onBack = onBack)
+                StepHeader(title = title, onBack = onBack)
             }
             HorizontalDivider(color = Toolbill.stateColors.dividerDense)
             options.forEach { (code, name) ->
@@ -237,4 +247,84 @@ fun FirstChargeDatePicker(
 private fun everyPhrase(count: Int, unitIndex: Int): String {
     val singular = unitLabels[unitIndex].lowercase().removeSuffix("s")
     return if (count == 1) "every $singular" else "every $count ${singular}s"
+}
+
+/**
+ * The category picker, behind the sheet's Category row.
+ *
+ * Lists the eleven fixed categories plus Other, and offers "Auto, from name" at the top — which
+ * is what the row said it was doing all along while the row itself did nothing when tapped.
+ */
+@Composable
+fun CategoryPickerContent(
+    selected: Category?,
+    autoCategory: Category?,
+    onBack: () -> Unit,
+    onPick: (Category?) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        StepHeader(title = "Category", onBack = onBack)
+        Spacer(Modifier.height(Space.s2))
+
+        CategoryRow(
+            label = "Auto · from name",
+            detail = autoCategory?.displayName?.let { "Currently $it" }
+                ?: "No match in the bundled list yet — falls back to Other",
+            selected = selected == null,
+            onClick = { onPick(null) },
+        )
+        HorizontalDivider(color = Toolbill.stateColors.dividerDense)
+
+        Category.entries.forEach { category ->
+            CategoryRow(
+                label = category.displayName,
+                detail = null,
+                selected = selected == category,
+                onClick = { onPick(category) },
+            )
+        }
+        Spacer(Modifier.height(Space.s8))
+    }
+}
+
+@Composable
+private fun CategoryRow(
+    label: String,
+    detail: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = Space.s4, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = ToolbillText.settingsTitle,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            detail?.let {
+                Text(
+                    text = it,
+                    style = ToolbillText.settingsBody,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (selected) {
+            Text(
+                text = "✓",
+                style = ToolbillText.settingsTitle,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }

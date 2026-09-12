@@ -104,8 +104,8 @@ object ReminderNotifier {
      * real ones do not, the problem is scheduling rather than the notification path, and that
      * is exactly the distinction the screen exists to draw.
      */
-    fun notifyTest(context: Context) {
-        if (!canNotify(context)) return
+    fun notifyTest(context: Context): Boolean {
+        if (!canNotify(context)) return false
         ensureChannel(context)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_RENEWALS)
@@ -120,6 +120,7 @@ object ReminderNotifier {
         // Guarded by canNotify above.
         @SuppressLint("MissingPermission")
         NotificationManagerCompat.from(context).notify(TEST_NOTIFICATION_ID, notification)
+        return true
     }
 
     private fun openApp(context: Context, requestCode: Int): PendingIntent {

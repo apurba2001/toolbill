@@ -353,7 +353,42 @@ proven before any credentials exist — and because it is destination-agnostic, 
       deleted a subscription, restored — dialog read "1 to add. Nothing on this device is
       deleted. 4 you have edited more recently than the backup are left as they are", and the
       burn returned to exactly A$75.71 across 5 active
-- [x] 216 JVM and 40 instrumented tests green, 0 lint errors
+- [x] 219 JVM and 40 instrumented tests green, 0 lint errors
+
+## Device-reported fixes
+
+Everything below came from the user testing builds on a Samsung SM-M066B (Android 16), not from
+the plan. Each is listed with the cause, because the cause is what stops it recurring.
+
+- [x] **App lock re-prompted after a file picker and after system settings.** The lock fired on
+      every `onStop`, and the app cannot tell a user leaving from the app sending them out.
+      `MainActivity` now latches on its own `startActivity` overrides -- all three -- so a trip
+      the app initiated returns unlocked, and a trip the user initiated still locks. A 60s grace
+      covers paths that never reach those overrides.
+- [x] **Diagnostics offered fixes for permissions already granted.** The guidance is now gated on
+      `needsAttention`; a healthy phone sees only the device line.
+- [x] **"Send test" did not update "Last reminder fired".** It does now, suffixed " (test)" --
+      unsuffixed would let the screen look healthy on a phone dropping every real renewal, which
+      is the failure it exists to catch.
+- [x] **Paywall drifted from the design.** Restored the header restore-purchase, the Continue CTA
+      and the footer. Yearly and Lifetime are equal height and width via
+      `Row(Modifier.height(IntrinsicSize.Min))` + `weight(1f).fillMaxHeight()`. Continue was
+      missing because I had removed it, not because the app was sideloaded; tapping it now says
+      so plainly rather than failing silently.
+- [x] **Three Settings rows did nothing on tap.** `SettingItem` is only clickable when it has an
+      action. Exchange rates is now tap-to-refresh; Categories and Paused are plain readouts.
+      The first tap threw `NetworkOnMainThreadException` -- fixed in `FrankfurterApi` at the
+      boundary, not the call site, so no future caller can reintroduce it.
+- [x] **Search and filter showed the wrong empty state and dropped the chips.** The gate was on
+      the filtered list; it is now on the unfiltered one, so an empty *result* and an empty
+      *portfolio* are different screens. Search input restyled to the design.
+- [x] **Edit sheet: cycle text wrapping, "1 Sep" twice, dead category dropdown, subscription
+      absent from the calendar.** The duplicate chip and the empty calendar were one bug -- the
+      preset resolved to next year; it is now the 1st of next month. Category opens a real
+      picker.
+- [x] **No-matches state looked unfinished.** Rebuilt in the app's own language: dimmed hero
+      showing the burn the filter is hiding, a headline naming the cause, the count that is
+      still there, and a "Show all N" button.
 
 ## Next
 

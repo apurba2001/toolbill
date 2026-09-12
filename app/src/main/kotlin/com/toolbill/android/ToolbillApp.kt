@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -411,6 +415,13 @@ fun ToolbillApp(
                 onOpenImport = { stack.add(Screen.Import) },
                 onOpenPaywall = { stack.add(Screen.Paywall) },
                 onUndoImport = viewModel::undoLastImport,
+                onRefreshRates = {
+                    // The same call the daily worker makes; the installed table is a StateFlow,
+                    // so a success re-prices every figure on every screen without this screen
+                    // having to tell anything.
+                    (context.applicationContext as? ToolbillApplication)
+                        ?.fxRepository?.refresh() ?: false
+                },
                 onBackUp = { backupFile.launch(backupViewModel.suggestedFileName()) },
                 onRestore = { restoreFile.launch(arrayOf("application/gzip", "application/json", "*/*")) },
                 entitlement = entitlement,
@@ -470,6 +481,7 @@ fun ToolbillApp(
             Screen.Paywall -> PaywallScreen(
                 modifier = inset,
                 entitlement = entitlement,
+                trackedCount = subscriptions.size,
                 onDismiss = pop,
             )
             is Screen.Detail -> {
@@ -529,26 +541,58 @@ fun ToolbillApp(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (searching && tab == Tab.ALL) {
-                        BasicTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            singleLine = true,
-                            textStyle = ToolbillText.appBarTitle.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.weight(1f),
-                            decorationBox = { inner ->
-                                if (query.isEmpty()) {
-                                    Text(
-                                        text = "Search name, category or notes",
-                                        style = ToolbillText.appBarTitle,
-                                        color = MaterialTheme.colorScheme.outline,
-                                    )
-                                }
-                                inner()
-                            },
-                        )
+                        // The design's search bar: one rounded field spanning the row, with the
+                        // way out inside it. A bare text field sharing the bar with the title
+                        // read as the title having been replaced by an editable label.
+                        val focus = remember { FocusRequester() }
+                        LaunchedEffect(Unit) { focus.requestFocus() }
+
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(Radius.full)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ToolbillIconButton(
+                                icon = ToolbillIcons.Back,
+                                contentDescription = "Close search",
+                                onClick = { searching = false; query = "" },
+                            )
+                            BasicTextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                singleLine = true,
+                                textStyle = ToolbillText.appBarTitle.copy(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(focus),
+                                decorationBox = { inner ->
+                                    if (query.isEmpty()) {
+                                        Text(
+                                            // The real count, so the field says how much it is
+                                            // searching rather than listing the fields it looks in.
+                                            text = "Search ${subscriptions.size} subscription" +
+                                                if (subscriptions.size == 1) "" else "s",
+                                            style = ToolbillText.appBarTitle,
+                                            color = MaterialTheme.colorScheme.outline,
+                                        )
+                                    }
+                                    inner()
+                                },
+                            )
+                            if (query.isNotEmpty()) {
+                                ToolbillIconButton(
+                                    icon = ToolbillIcons.Close,
+                                    contentDescription = "Clear search",
+                                    onClick = { query = "" },
+                                )
+                            }
+                        }
                     } else {
                         Text(
                             text = titleFor(tab, subscriptions.size),
@@ -556,26 +600,22 @@ fun ToolbillApp(
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )
+                        ToolbillIconButton(
+                            icon = if (tab == Tab.ALL) {
+                                ToolbillIcons.Search
+                            } else {
+                                ToolbillIcons.Settings
+                            },
+                            contentDescription = if (tab == Tab.ALL) "Search" else "Settings",
+                            onClick = {
+                                if (tab == Tab.ALL) {
+                                    searching = true
+                                } else {
+                                    stack.add(Screen.Settings)
+                                }
+                            },
+                        )
                     }
-                    ToolbillIconButton(
-                        icon = when {
-                            tab != Tab.ALL -> ToolbillIcons.Settings
-                            searching -> ToolbillIcons.Close
-                            else -> ToolbillIcons.Search
-                        },
-                        contentDescription = when {
-                            tab != Tab.ALL -> "Settings"
-                            searching -> "Close search"
-                            else -> "Search"
-                        },
-                        onClick = {
-                            when {
-                                tab == Tab.HOME -> stack.add(Screen.Settings)
-                                searching -> { searching = false; query = "" }
-                                else -> searching = true
-                            }
-                        },
-                    )
                 }
             }
         },
@@ -660,6 +700,7 @@ fun ToolbillApp(
                 // screen, which is a different thing the row already does on a plain tap.
                 onEdit = { editing = it.subscription; sheetOpen = true },
                 onDelete = { viewModel.deleteWithUndo(it.subscription) },
+                onClearSearch = { query = "" },
             )
 
             Tab.CALENDAR -> CalendarScreen(

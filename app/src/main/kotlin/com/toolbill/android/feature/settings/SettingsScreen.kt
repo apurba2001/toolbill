@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import com.toolbill.android.BiometricAuthManager
 import com.toolbill.android.BuildConfig
 import com.toolbill.android.core.billing.Entitlement
@@ -119,6 +121,7 @@ fun SettingsScreen(
     entitlement: Entitlement = Entitlement.Free,
     onBackUp: () -> Unit = {},
     onRestore: () -> Unit = {},
+    onRefreshRates: suspend () -> Boolean = { false },
     onBack: () -> Unit = {},
     userSettings: UserSettings
 ) {
@@ -129,6 +132,9 @@ fun SettingsScreen(
     val appLockEnabled by userSettings.appLockEnabled.collectAsState()
     val leadTimeDays by userSettings.leadTimeDaysFlow.collectAsState()
     val fxTable by FxRates.table.collectAsState()
+    val scope = rememberCoroutineScope()
+    var ratesBusy by remember { mutableStateOf(false) }
+    var ratesMessage by remember { mutableStateOf<String?>(null) }
     // Read once per open: the window closes on a clock, not on a state change.
     val importUndoCount = remember { userSettings.lastImportIds.size }
     val themeIndex = themeMode.ordinal
@@ -161,15 +167,36 @@ fun SettingsScreen(
                     // States the source and the publication date, and does not claim live
                     // figures on an install that has never reached the network. The ECB
                     // publishes on business days, so the date is routinely not today.
-                    body = if (fxTable.isLive) {
-                        "European Central Bank, published " +
-                            fxTable.capturedOn.format(rateCaptureFormat)
-                    } else {
-                        "Bundled table from ${fxTable.capturedOn.format(rateCaptureFormat)} — " +
-                            "not refreshed yet"
+                    body = when {
+                        ratesBusy -> "Checking for newer rates…"
+                        ratesMessage != null -> ratesMessage
+                        fxTable.isLive -> "European Central Bank, published " +
+                            fxTable.capturedOn.format(rateCaptureFormat) + " · tap to check again"
+
+                        else -> "Bundled table from " +
+                            "${fxTable.capturedOn.format(rateCaptureFormat)} — tap to fetch"
                     },
                     value = if (fxTable.isLive) "live" else "bundled",
                 ),
+                onClick = if (ratesBusy) {
+                    null
+                } else {
+                    {
+                        scope.launch {
+                            ratesBusy = true
+                            ratesMessage = null
+                            val refreshed = onRefreshRates()
+                            ratesBusy = false
+                            // Says which happened. A refresh that silently changed nothing is
+                            // indistinguishable from one that never ran.
+                            ratesMessage = if (refreshed) {
+                                "Updated just now"
+                            } else {
+                                "Could not reach the rate source — keeping what is on file"
+                            }
+                        }
+                    }
+                },
             )
         }
         items(moneyRows, key = { it.title }) { SettingItem(it) }
@@ -271,8 +298,12 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = "Ask for your fingerprint or screen lock every time Toolbill " +
-                                "comes back to the foreground",
+                            // Says what it actually does. "Every time it comes back" was true
+                            // of the old behaviour, which also re-asked after a file picker --
+                            // an errand the user was in the middle of.
+                            text = "Ask for your fingerprint or screen lock when you come back " +
+                                "to Toolbill. Stepping out to pick a file won't re-ask; a dark " +
+                                "screen always will.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -380,6 +411,7 @@ fun SettingsScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             CurrencyPickerContent(
+                title = "Home currency",
                 selected = homeCurrency,
                 onBack = { pickingCurrency = false },
                 onPick = { userSettings.setHomeCurrency(it); pickingCurrency = false },
@@ -400,11 +432,14 @@ private fun GroupHeader(label: String) {
 }
 
 @Composable
-private fun SettingItem(row: SettingRow, onClick: () -> Unit = {}) {
+private fun SettingItem(row: SettingRow, onClick: (() -> Unit)? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            // Only rows that do something are clickable. With a no-op default every
+            // informational row still rippled under a finger and then sat there, which reads as
+            // a broken button rather than as a line of text that was never meant to be tapped.
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = Space.s4, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -29,6 +29,10 @@ import com.toolbill.android.core.design.Space
 import com.toolbill.android.core.design.Toolbill
 import com.toolbill.android.core.design.component.AmountColumnHeader
 import com.toolbill.android.core.design.component.DenseSubscriptionRow
+import androidx.compose.foundation.layout.Column
+import com.toolbill.android.core.design.component.ToolbillTextButton
+import com.toolbill.android.core.design.component.HeroAmount
+import com.toolbill.android.core.design.component.ToolbillButton
 import com.toolbill.android.core.design.component.EmptyState
 import com.toolbill.android.core.design.component.Filter
 import com.toolbill.android.core.design.component.FilterChipRow
@@ -62,6 +66,7 @@ fun AllSubscriptionsScreen(
     onDuplicate: (PricedSubscription) -> Unit = {},
     onEdit: (PricedSubscription) -> Unit = {},
     onDelete: (PricedSubscription) -> Unit = {},
+    onClearSearch: () -> Unit = {},
     query: String = "",
 ) {
     var sheetFor by remember { mutableStateOf<PricedSubscription?>(null) }
@@ -125,7 +130,11 @@ fun AllSubscriptionsScreen(
         }
     }
 
-    if (sorted.isEmpty()) {
+    // Only when there is genuinely nothing tracked. A search or a filter that matches nothing is
+    // a different situation with a different answer, and showing "No subscriptions yet" over a
+    // portfolio of thirty was both untrue and alarming -- it took the filter row away with it,
+    // so the control that emptied the list was the one control the user could no longer reach.
+    if (subscriptions.isEmpty()) {
         EmptyState(
             amountMinor = 0,
             currency = home,
@@ -187,6 +196,24 @@ fun AllSubscriptionsScreen(
             HorizontalDivider(color = Toolbill.stateColors.dividerDense)
         }
 
+        if (sorted.isEmpty()) {
+            item {
+                NoMatches(
+                    query = query,
+                    filterLabel = filters.getOrNull(filterIndex)?.label.takeIf { filterIndex != 0 },
+                    hiddenCount = subscriptions.size,
+                    // What the filter is hiding, on the same normalized basis every other total
+                    // in the app uses.
+                    hiddenMonthlyMinor = subscriptions
+                        .filter { it.subscription.status.countsTowardBurn }
+                        .sumOf { normalizedMonthlyMinor(it.homeAmountMinor, it.subscription.cycle) },
+                    homeCurrency = home,
+                    onClearFilter = { filterIndex = 0 },
+                    onClearSearch = onClearSearch,
+                )
+            }
+        }
+
         items(sorted, key = { it.subscription.id }) { priced ->
             DenseSubscriptionRow(
                 row = priced.subscription.toRowUi(
@@ -201,7 +228,7 @@ fun AllSubscriptionsScreen(
             HorizontalDivider(color = Toolbill.stateColors.dividerDense)
         }
 
-        item {
+        if (sorted.isNotEmpty()) item {
             TotalFooter(
                 primary = "${MoneyFormat.symbol(activeTotal, home)} / month across " +
                     "${active.size} active",
@@ -272,3 +299,91 @@ private fun buildExclusionCaption(
     }
     return "excludes $joined · annual plans counted at their monthly share"
 }
+
+/**
+ * What to show when the list is empty because of the controls above it, not because of the data.
+ *
+ * Built like the real empty state rather than as a line of centred text: the same dimmed hero,
+ * the same left-aligned headline and body, the same button. A sentence floating in the middle of
+ * a blank screen reads as something having gone wrong, which is the opposite of what has
+ * happened — the portfolio is intact and one filter is hiding it.
+ *
+ * The hero shows the burn the filter is currently hiding, so the figure on screen is the answer
+ * to "where did everything go".
+ */
+@Composable
+private fun NoMatches(
+    query: String,
+    filterLabel: String?,
+    hiddenCount: Int,
+    hiddenMonthlyMinor: Long,
+    homeCurrency: String,
+    onClearFilter: () -> Unit,
+    onClearSearch: () -> Unit,
+) {
+    // ROOT, not the device locale. These labels are fixed English tokens defined in this
+    // file, so there is nothing to localise -- and reading the device locale inside a composable
+    // is not observable, so a locale change would not recompose this text anyway.
+    val lowerFilter = filterLabel?.lowercase(Locale.ROOT)
+    val trimmed = query.trim()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Space.s4, vertical = Space.s8),
+    ) {
+        HeroAmount(
+            amountMinor = hiddenMonthlyMinor,
+            currency = homeCurrency,
+            alpha = 0.5f,
+            modifier = Modifier.padding(vertical = Space.s2),
+        )
+        Spacer(Modifier.height(Space.s4))
+        Text(
+            text = when {
+                trimmed.isNotEmpty() && lowerFilter != null ->
+                    "Nothing $lowerFilter matches \"$trimmed\"."
+
+                trimmed.isNotEmpty() -> "Nothing matches \"$trimmed\"."
+                lowerFilter != null -> "Nothing is $lowerFilter right now."
+                else -> "Nothing to show."
+            },
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(Space.s2))
+        Text(
+            text = when {
+                trimmed.isNotEmpty() ->
+                    "Search looks at names, categories and notes. " +
+                        "You track ${plural(hiddenCount, "subscription")} in total."
+
+                else -> "Your ${plural(hiddenCount, "subscription")} " +
+                    (if (hiddenCount == 1) "is" else "are") + " still here. None of them " +
+                    (if (hiddenCount == 1) "is" else "are") + " $lowerFilter."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Space.s6))
+        Column(verticalArrangement = Arrangement.spacedBy(Space.s4)) {
+            if (filterLabel != null) {
+                ToolbillButton(
+                    text = "Show all $hiddenCount",
+                    onClick = onClearFilter,
+                )
+            }
+            if (trimmed.isNotEmpty()) {
+                if (filterLabel != null) {
+                    ToolbillTextButton(text = "Clear search", onClick = onClearSearch)
+                } else {
+                    ToolbillButton(text = "Clear search", onClick = onClearSearch)
+                }
+            }
+        }
+    }
+}
+
+/** "1 subscription", "5 subscriptions". */
+private fun plural(count: Int, noun: String): String =
+    if (count == 1) "1 $noun" else "$count ${noun}s"
